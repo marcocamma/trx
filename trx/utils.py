@@ -10,6 +10,12 @@ import glob
 import pathlib
 import re
 import numbers
+try:
+  import progressbar as pb
+  _has_progress_bar = True
+except ImportError:
+  _has_progress_bar = False
+  log.warn("Reccomended package: progressbar is missing")
 from datastorage import DataStorage
 
 try:
@@ -75,6 +81,21 @@ def removeExt(fname):
 def getBasename(fname):
   return os.path.basename(removeExt(fname));
 
+def progressBar(N,title="Percentage"):
+  if _has_progress_bar:
+    widgets = [title, pb.Percentage(), ' ', pb.Bar(), ' ', pb.ETA()]
+    pbar = pb.ProgressBar(widgets=widgets, maxval=N)
+  else:
+    class FakeBar(object):
+      def __init__(self): pass
+      def start(self):    pass
+      def update(self,i): pass
+      def finish(self):   pass
+    pbar = FakeBar()
+  pbar.start()
+  return pbar
+
+
 def findSlice(array,lims):
   start = np.ravel(np.argwhere(array>lims[0]))[0]
   stop  = np.ravel(np.argwhere(array<lims[1]))[-1]
@@ -100,7 +121,7 @@ def removeBackground(x,data,xlims=None,max_iter=100,background_regions=[],**kw):
   
 
 def plotdata(*args,x=None,plot=True,showTrend=True,title=None,clim='auto',fig=None):
-  if isinstance(args[0],datastorage.datastorage.DataStorage):
+  if isinstance(args[0],DataStorage):
     q = args[0].q; data=args[0].data;
     if title is None: title = args[0].folder
   else:
@@ -147,10 +168,10 @@ def plotdiffs(*args,select=None,err=None,absSignal=None,absSignalScale=10,
               showErr=False,cmap=plt.cm.jet,fig=None,title=None):
   # this selection trick done in this way allows to keep the same colors when 
   # subselecting (because I do not change the size of diffs)
-  if isinstance(args[0],datastorage.datastorage.DataStorage):
+  if isinstance(args[0],DataStorage):
     q = args[0].q; t = args[0].scan; err = args[0].err
-    diffs = args[0].data
-    diffs_abs = args[0].dataAbsAvScanPoint
+    diffs = args[0].diff
+    diffs_abs = args[0].diff_plus_ref
   else:
     q,diffs,t = args
     diffs_abs = None
@@ -255,7 +276,8 @@ def reshapeToBroadcast(what,ref):
       dimensions along the first axis
   """
   if what.shape == ref.shape: return what
-  assert what.shape[0] == ref.shape[0]
+  assert what.shape[0] == ref.shape[0],\
+    "automatic reshaping requires same first dimention"
   shape  = [ref.shape[0],] + [1,]*(ref.ndim-1)
   return what.reshape(shape)
 
@@ -264,9 +286,11 @@ def radToQ(theta,**kw):
       kw should be have either E or wavelength
       it returns the scattering vector in the units of wavelength """
   # Energy or wavelength should be in kw
-  assert "E" in kw or "wavelength" in kw
+  assert "E" in kw or "wavelength" in kw,\
+    "need wavelength or E to convert rad to Q"
   # but not both
-  assert not ("E" in kw and "wavelength" in kw)
+  assert not ("E" in kw and "wavelength" in kw),\
+    "conflicting arguments (E and wavelength)"
   if "E" in kw: kw["wavelength"] = 12.398/kw["E"]
   return 4*np.pi/kw["wavelength"]*np.sin(theta)
 
@@ -278,9 +302,11 @@ degToQ.__doc__ = radToQ.__doc__
 def qToTheta(q,asDeg=False,**kw):
   """ Return scattering angle from q (given E or wavelength) """
   # Energy or wavelength should be in kw
-  assert "E" in kw or "wavelength" in kw
+  assert "E" in kw or "wavelength" in kw,\
+    "need wavelength or E to convert rad to Q"
   # but not both
-  assert not ("E" in kw and "wavelength" in kw)
+  assert not ("E" in kw and "wavelength" in kw),\
+    "conflicting arguments (E and wavelength)"
   if "E" in kw: kw["wavelength"] = 12.398/kw["E"]
   theta = np.arcsin(q*kw["wavelength"]/4/np.pi)
   if asDeg: theta = np.rad2deg(theta)

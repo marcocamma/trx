@@ -18,5 +18,7 @@ setup(name='trx',
           'fabio',
           'pyFAI',
           'matplotlib',
+          'progressbar',
+          'datastorage',
       ],
       zip_safe=False)

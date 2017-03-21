@@ -12,6 +12,15 @@ log = logging.getLogger(__name__)  # __name__ is "foo.bar" here
 import numpy as np
 np.seterr(all='ignore')
 
+def applyFilter(data,boolArray):
+  for key in data.keys():
+    if isinstance(data[key],np.ndarray) and \
+       (data[key].shape[0]==boolArray.shape[0]):
+      data[key] = data[key][boolArray]
+    elif isinstance(data[key],dict) and key != 'orig':
+      data[key]=applyFilter(data[key],boolArray)
+  return data
+
 def removeZingers(curves,errs=None,norm='auto',threshold=10,useDerivative=False):
   """ curves will be normalized internally 
       if errs is None, calculate mad based noise 

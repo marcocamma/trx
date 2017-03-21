@@ -66,8 +66,8 @@ def subtractReferences(i,idx_ref, useRatio = False):
     i -= iref
   return i
 
-def averageScanPoints(scan,data,errAbs=None,isRef=None,lpower=None,useRatio=False,\
-    funcForAveraging=np.nanmean):
+def averageScanPoints(scan,data,errAbs=None,isRef=None,lpower=None,
+    useRatio=False,funcForAveraging=np.nanmean):
   """ given scanpoints in 'scan' and corresponding data in 'data'
       average all data corresponding the exactly the same scanpoint.
       If the values in scan are coming from a readback, rounding might be
@@ -81,82 +81,83 @@ def averageScanPoints(scan,data,errAbs=None,isRef=None,lpower=None,useRatio=Fals
       funcForAveraging: is usually np.nanmean or np.nanmedian. it can be any 
          function that support axis=0 as keyword argument
 """
+  args = dict( isRef = isRef, lpower = lpower, useRatio = useRatio )
   data = data.astype(np.float)
-  avData = np.nanmedian( data , axis = 0 )
+  average = np.mean(data,axis=0)
+  median  = np.median(data,axis=0)
 
   if isRef is None: isRef = np.zeros( data.shape[0], dtype=bool )
-  assert data.shape[0] == isRef.shape[0]
+  assert data.shape[0] == isRef.shape[0], \
+    "Size mismatch, data is %d, isRef %d"%(data.shape[0],isRef.shape[0])
 
   # subtract reference only is there is at least one
   if isRef.sum()>0:
     # create a copy (subtractReferences works in place)
-    diff = subtractReferences(data.copy(),np.argwhere(isRef), useRatio=useRatio)
-    avNeg = funcForAveraging(data[isRef],axis=0)
+    diff_all = subtractReferences(data.copy(),np.argwhere(isRef),
+               useRatio=useRatio)
+    ref_average = funcForAveraging(data[isRef],axis=0)
   else:
-    diff = data
-    avNeg = np.zeros_like(avData)
+    diff_all = data
+    ref_average = np.zeros_like(average)
 
   # normalize signal for laser intensity if provided
   if lpower is not None:
     lpower = utils.reshapeToBroadcast(lpower,data)
     if useRatio is False:
-      diff /= lpower
+      diff_all /= lpower
     else:
-      diff = (data-1)/lpower+1
+      diff_all = (diff_all-1)/lpower+1
 
   scan_pos = np.unique(scan)
-  shape_out = [len(scan_pos),] + list(diff.shape[1:])
-  ret       = np.empty(shape_out)
-  err       = np.empty(shape_out)
-  data_abs  = np.empty(shape_out)
-  diffsInScanPoint = []
+  shape_out = [len(scan_pos),] + list(diff_all.shape[1:])
+  diff      = np.empty(shape_out)
+  diff_err  = np.empty(shape_out)
+  diffs_in_scan = []
   chi2_0 = []
   for i,t in enumerate(scan_pos):
     shot_idx = (scan == t)
 
     # select data for the scan point
-    diff_for_scan = diff[shot_idx]
-    #if errAbs is not None:
-    #  noise  = np.nanmean(errAbs[shot_idx],axis = 0)
-    #else:
-    noise = np.nanstd(diff_for_scan, axis = 0)
+    diff_for_scan = diff_all[shot_idx]
+    if errAbs is not None:
+      noise  = np.nanmean(errAbs[shot_idx],axis = 0)
+    else:
+      noise = np.nanstd(diff_for_scan, axis = 0)
 
     # if it is the reference take only every second ...
     if np.all( shot_idx == isRef ):
       diff_for_scan = diff_for_scan[::2]
 
-    diffsInScanPoint.append( diff_for_scan )
+    diffs_in_scan.append( diff_for_scan )
 
     # calculate average
-    ret[i] = funcForAveraging(diff_for_scan,axis=0)
-    data_abs[i] = funcForAveraging(data[shot_idx],axis=0)
+    diff[i] = funcForAveraging(diff_for_scan,axis=0)
 
     # calculate chi2 of different repetitions
-    chi2 = np.power( (diff_for_scan - ret[i])/noise,2)
+    chi2 = np.power( (diff_for_scan - diff[i])/noise,2)
     # sum over all axis but first
     for _ in range(diff_for_scan.ndim-1):
       chi2 = np.nansum( chi2, axis=-1 )
 
     # store chi2_0
-    chi2_0.append( chi2/ret[i].size )
+    chi2_0.append( chi2/diff[i].size )
 
     # store error of mean
-    err[i] = noise/np.sqrt(shot_idx.sum())
-  ret = dict(scan=scan_pos,data=ret,dataUnmasked=ret.copy(),err=err,
-        errUnmasked=err.copy(),chi2_0=chi2_0,diffsInScanPoint=diffsInScanPoint,
-        dataAbsAvNeg = avNeg, dataAsAbs=ret+avNeg,errAbs=errAbs,
-        dataAbsAvAll=avData,dataAbsAvScanPoint=data_abs,dataAbs=data.copy())
+    diff_err[i] = noise/np.sqrt(shot_idx.sum())
+  ret = dict(scan=scan_pos,diff=diff,err=diff_err,
+        chi2_0=chi2_0,diffs_in_scan=diffs_in_scan,
+        ref_average = ref_average, diff_plus_ref=diff+ref_average,
+        average=average,median=median,args=args)
   ret = DataStorage(ret)
   return ret
 
 
-def calcTimeResolvedSignal(scan,data,err=None,reference="min",monitor=None,q=None,
-    saveTxt=True,folder="./",**kw):
+def calcTimeResolvedSignal(scan,data,err=None,reference="min",q=None,
+    monitor=None,saveTxt=True,folder="./",**kw):
   """
     reference: can be 'min', 'max', a float|integer or an array of booleans
+    data     : >= 2dim array (first index is image number)
     q        : is needed if monitor is a tuple|list
-    monitor  : normalization vector (if it is interpreted a list it is
-               interpreted as q-range normalization)
     saveTxt  : will save txt outputfiles (diff_av_*) in folder
     other keywords are passed to averageScanPoints
   """
@@ -171,8 +172,8 @@ def calcTimeResolvedSignal(scan,data,err=None,reference="min",monitor=None,q=Non
   # normalize if needed
   if monitor is not None:
     if isinstance(monitor,(tuple,list)):
-      assert q is not None
-      assert data.ndim == 2
+      assert q is not None, "q is None and can't work with q-range scaling"
+      assert data.ndim == 2, "currently q-range scaling works with 2dim data"
       idx = (q>= monitor[0]) & (q<= monitor[1])
       monitor = np.nanmedian(data[:,idx],axis=1)
     monitor = utils.reshapeToBroadcast(monitor,data)
@@ -189,10 +190,12 @@ def saveTxt(folder,data,delayToStr=True,basename='auto',info="",**kw):
   folder = os.path.abspath(folder);
   if basename == 'auto':
       basename = "_".join(folder.rstrip("/").split("/")[-2:]) + "_"
-  q = data.q if "q" in data else np.arange(data.data.shape[-1])
+  q = data.q if "q" in data else np.arange(data.diff.shape[-1])
   # save one file with all average diffs
   fname = "%s/%sdiff_av_matrix.txt" % (folder,basename)
-  utils.saveTxt(fname,q,data.data,headerv=data.scan,**kw)
+  utils.saveTxt(fname,q,data.diff,headerv=data.scan,**kw)
+  fname = "%s/%sdiff_plus_ref_av_matrix.txt" % (folder,basename)
+  utils.saveTxt(fname,q,data.diff_plus_ref,headerv=data.scan,**kw)
   # save error bars in the matrix form
   fname = "%s/%sdiff_av_matrix_err.txt" % (folder,basename)
   utils.saveTxt(fname,q,data.err,headerv=data.scan,**kw)
@@ -214,18 +217,18 @@ def saveTxt(folder,data,delayToStr=True,basename='auto',info="",**kw):
 
     # save one file per timedelay with average diff (and err)
     fname = "%s/%sdiff_av_%s.txt" % (folder,basename,scan)
-    if 'mask' in data:
-      tosave = np.vstack( (data.data[iscan],data.err[iscan],
-               data.dataUnmasked[iscan],data.errUnmasked[iscan] ) )
-      columns = 'q diffmask errmask diffnomask errnomask'.split()
-    else:
-      tosave = np.vstack( (data.data[iscan],data.err[iscan] ) )
-      columns = 'q diff err'.split()
+#    if 'mask' in data:
+#      tosave = np.vstack( (data.diff[iscan],data.err[iscan],
+#               data.dataUnmasked[iscan],data.errUnmasked[iscan] ) )
+#      columns = 'q diffmask errmask diffnomask errnomask'.split()
+#    else:
+    tosave = np.vstack( (data.diff[iscan],data.err[iscan] ) )
+    columns = 'q diff err'.split()
     utils.saveTxt(fname,q,tosave,info=info_delay,columns=columns)
 
     # save one file per timedelay with all diffs for given delay
     fname = "%s/%sdiffs_%s.txt" % (folder,basename,scan)
-    utils.saveTxt(fname,q,data.diffsInScanPoint[iscan],info=info_delay,**kw)
+    utils.saveTxt(fname,q,data.diffs_in_scan[iscan],info=info_delay,**kw)
 
 
 def read_diff_av(folder,plot2D=False,save=None):

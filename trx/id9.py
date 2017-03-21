@@ -67,7 +67,8 @@ def findLogFile(folder):
   if len(files)>1: log.warn("Found more than one *.log file that is not diagnostics.log: %s"%files)
   return logfile
 
-def readLogFile(fnameOrFolder,subtractDark=False,skip_first=0,asDataStorage=True,last=None):
+def readLogFile(fnameOrFolder,subtractDark=False,skip_first=0,
+    asDataStorage=True,last=None,srcur_min=80):
   """ read id9 style logfile """
   if os.path.isdir(fnameOrFolder):
     fname = findLogFile(fnameOrFolder)
@@ -86,6 +87,8 @@ def readLogFile(fnameOrFolder,subtractDark=False,skip_first=0,asDataStorage=True
   for iline,line in enumerate(lines):
     if line.lstrip()[0] != "#": break
   data=np.genfromtxt(fname,skip_header=iline-1,names=True,comments="%",dtype=None,converters = {'delay': lambda s: _delayToNum(s)})
+  idx_cur = data['currentmA'] > srcur_min
+  data = data[idx_cur]
   if subtractDark:
     for diode in ['pd1ic','pd2ic','pd3ic','pd4ic']:
       if diode in darks: data[diode]=data[diode]-darks[diode]*data['timeic']
@@ -97,46 +100,11 @@ def readLogFile(fnameOrFolder,subtractDark=False,skip_first=0,asDataStorage=True
   return data
 
 
-
 def doFolder_azav(folder,nQ=1500,files='*.edf*',force=False,mask=None,
   saveChi=True,poni='pyfai.poni',storageFile='auto',dark=9.9,dezinger=None,
-  qlims=(0,10),removeBack=False,removeBack_kw=dict(),skip_first=0,
-  last=None):
+  qlims=None,monitor='auto',skip_first=0,last=None,srcur_min=80):
   """ very small wrapper around azav.doFolder, essentially just reading
-      the id9 logfile or diagnostics.log """
-
-  try:
-    loginfo = readLogFile(folder,skip_first=skip_first,last=last)
-  except Exception as e:
-    log.warn("Could not read log file, trying to read diagnostics.log")
-    loginfo = readDiagnostic(folder)
-  if storageFile == 'auto' : storageFile = folder +  "/" + "pyfai_1d" + default_extension
-
-  data = azav.doFolder(folder,files=files,nQ=nQ,force=force,mask=mask,
-    saveChi=saveChi,poni=poni,storageFile=storageFile,logDict=loginfo,dark=dark,save=False,dezinger=dezinger)
-  #try:
-  #  if removeBack is not None:
-  #    _,data.data = azav.removeBackground(data,qlims=qlims,**removeBack_kw)
-  #except Exception as e:
-  #  log.error("Could not remove background, error was %s"%(str(e)))
-
-#  idx = utils.findSlice(data.q,qlims)
-#  n   = np.nanmean(data.data[:,idx],axis=1)
-#  data.norm_range = qlims
-#  data.norm = n
-#  n   = utils.reshapeToBroadcast(n,data.data)
-#  data.data_norm = data.data/n
-
-  data.save(storageFile)
-
-
-  return data
-
-
-
-def doFolder_dataRed(azavStorage,monitor=None,funcForAveraging=np.nanmean,
-                     qlims=None,outStorageFile='auto',reference='min'):
-  """ azavStorage if a DataStorage instance or the filename to read 
+      the id9 logfile or diagnostics.log
       monitor  : normalization vector that can be given as
                1. numpy array
                2. a list (interpreted as q-range normalization)
@@ -144,41 +112,61 @@ def doFolder_dataRed(azavStorage,monitor=None,funcForAveraging=np.nanmean,
                   monitor="pd2ic" would reult in using
                   azavStorage.log.pd2ic
 
+
+ """
+
+  try:
+    loginfo = readLogFile(folder,skip_first=skip_first,last=last,
+              srcur_min=srcur_min)
+  except Exception as e:
+    log.warn("Could not read log file, trying to read diagnostics.log")
+    loginfo = readDiagnostic(folder)
+  if storageFile == 'auto' : storageFile = folder +  "/" + "pyfai_1d" + default_extension
+
+  if monitor != "auto" and isinstance(monitor,str): monitor = loginfo[monitor]
+
+  data = azav.doFolder(folder,files=files,nQ=nQ,force=force,mask=mask,
+    saveChi=saveChi,poni=poni,storageFile=storageFile,logDict=loginfo,
+    dark=dark,save=False,dezinger=dezinger,qlims=qlims,monitor=monitor)
+  data.save(storageFile)
+  return data
+
+
+
+def doFolder_dataRed(azavStorage,funcForAveraging=np.nanmean,
+                     outStorageFile='auto',reference='min',saveTxt=True):
+  """ azavStorage if a DataStorage instance or the filename to read 
   """
 
-  if isinstance(azavStorage,datastorage.datastorage.DataStorage):
-    data = azavStorage
+  if isinstance(azavStorage,DataStorage):
+    azav = azavStorage
     folder = azavStorage.folder
   elif os.path.isfile(azavStorage):
     folder = os.path.dirname(azavStorage)
-    data = DataStorage(azavStorage)
+    azav = DataStorage(azavStorage)
   else:
     # assume is just a folder name
     folder = azavStorage
     azavStorage  = folder +  "/pyfai_1d" + default_extension
-    data = DataStorage(azavStorage)
+    azav = DataStorage(azavStorage)
 
-  #assert data.q.shape[0] == data.data.shape[1] == data.err.shape[1]
-  if qlims is not None:
-    idx = (data.q>qlims[0]) & (data.q<qlims[1])
-    data.data = data.data[:,idx]
-    data.err  = data.err[:,idx]
-    data.q    = data.q[idx]
-
-  if isinstance(monitor,str): monitor = data['log'][monitor]
 
   # calculate differences
-  diffs = dataReduction.calcTimeResolvedSignal(data.log.delay,data.data,
-          err=data.err,q=data.q,reference=reference,monitor=monitor,
+  tr = dataReduction.calcTimeResolvedSignal(azav.log.delay,azav.data_norm,
+          err=azav.err_norm,q=azav.q,reference=reference,
           funcForAveraging=funcForAveraging)
 
-  # save txt and npz file
-  dataReduction.saveTxt(folder,diffs,info=data.pyfai_info)
   if outStorageFile == 'auto':
     outStorageFile = folder + "/diffs" + default_extension
-  diffs.save(outStorageFile)
+  tr.filename = outStorageFile
+  tr.folder = folder
 
-  return data,diffs
+  # save txt and npz file
+  if saveTxt: dataReduction.saveTxt(folder,tr,info=azav.pyfai_info)
+
+  tr.save(outStorageFile)
+
+  return azav,tr
 
 def doFolder(folder,azav_kw = dict(), datared_kw = dict(),online=True, retryMax=20,force=False):
   import matplotlib.pyplot as plt
@@ -191,16 +179,16 @@ def doFolder(folder,azav_kw = dict(), datared_kw = dict(),online=True, retryMax=
   if online: print("Press Ctrl+C to stop")
   while keepGoing and retryNum < retryMax:
     try:
-      data = doFolder_azav(folder,**azav_kw)
+      azav = doFolder_azav(folder,**azav_kw)
       # check if there are new data
-      if lastNum is None or lastNum<data.data.shape[0]:
-        data,diffs = doFolder_dataRed(data,**datared_kw)
-        if lines is None or len(lines) != diffs.data.shape[0]:
-          lines,_ = utils.plotdiffs(diffs,fig=fig,title=folder)
+      if lastNum is None or lastNum<azav.data.shape[0]:
+        _,tr = doFolder_dataRed(azav,**datared_kw)
+        if lines is None or len(lines) != tr.diff.shape[0]:
+          lines,_ = utils.plotdiffs(tr,fig=fig,title=folder)
         else:
-          utils.updateLines(lines,diffs.data)
+          utils.updateLines(lines,tr.diff)
         plt.draw()
-        lastNum = data.data.shape[0]
+        lastNum = azav.data.shape[0]
         retryNum = 0
       else:
         retryNum += 1
@@ -209,4 +197,32 @@ def doFolder(folder,azav_kw = dict(), datared_kw = dict(),online=True, retryMax=
     except KeyboardInterrupt:
       keepGoing = False
     if not online: keepGoing = False
-  return data,diffs
+  return azav,tr
+
+
+def readMotorDump(fnameOrFolder,asDataStorage=True,\
+    default_fname="motor_position_after_data_collection.txt"):
+  """ 
+      Read waxecollect style motor dump
+      if fnameOrFolder is a folder, default_fname is read
+      if asDataStorage is False:
+        return recArray with fields name,user,dial
+      else: return dictory like object (each motor is a key)
+  """
+  if os.path.isfile(fnameOrFolder):
+    fname = fnameOrFolder
+  else:
+    fname = os.path.join(fnameOrFolder,default_fname)
+  data = np.genfromtxt(fname,names=True,dtype=("<U15",float,float))
+  # remove interleaved headers
+  idx_to_remove = data['name'] == 'name'
+  data = data[~idx_to_remove]
+#  for i in range(data.shape[0]): data['name'][i] = data['name'][i].decode('ascii')
+  if asDataStorage:
+    motor_pos = collections.namedtuple('motor_pos',['user','dial'])
+    ret = dict()
+    for imotor,motor in enumerate(data['name']):
+      ret[motor] = motor_pos(dial=data['dial'][imotor],user=data['user'][imotor])
+    data = DataStorage(ret)
+  return data
+  

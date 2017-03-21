@@ -6,6 +6,7 @@ log = logging.getLogger(__name__)
 
 import numpy as np
 np.seterr(all='ignore')
+import inspect
 import os
 import collections
 import glob
@@ -158,7 +159,7 @@ def _interpretMask(mask,shape=None):
   elif isinstance(mask,str) and not os.path.isfile(mask):
     err_msg = ValueError("The string '%s' could not be interpreted as simple\
               mask; it should be something like x>10"%mask)
-    assert shape is not None
+    assert shape is not None, "_interpretMask needs a shape to interpret a string"
     # interpret string
     maskout = np.zeros(shape,dtype=bool)
     match = g_mask_str.match(mask)
@@ -175,7 +176,7 @@ def _interpretMask(mask,shape=None):
   elif isinstance(mask,np.ndarray):
     maskout = mask.astype(np.bool)
   elif mask is None:
-    assert shape is not None
+    assert shape is not None, "_interpretMask needs a shape to interpret a string"
     maskout = np.zeros(shape,dtype=bool)
   else:
     maskout = None
@@ -202,31 +203,14 @@ def interpretMask(masks,shape=None):
     mask = np.logical_or(mask,m)
   return mask
 
-def removeBackground(data,qlims=(0,10),max_iter=30,background_regions=[],force=False,
-      storageFile=None,save=True,**removeBkg):
-  """ similar function to the zray.utils one, this works on dataset created by
-      doFolder """
-  idx = utils.findSlice(data.orig.q,qlims)
-  # see if there are some to do ...
-  if force:
-    idx_start = 0
-  else:
-    idx_start = len(data.data)
-  if idx_start < len(data.orig.data):
-    _q,_data = utils.removeBackground(data.orig.q[idx],data.orig.data[:,idx],
-               max_iter=max_iter,background_regions=background_regions,**removeBkg)
-    data.q = _q
-    data.data  = np.concatenate( (data.data,_data  ) )
-    data.err   = np.concatenate( (data.err ,data.err[idx_start,idx]   ) )
-  if save: data.save(storageFile); # if None uses .filename
-  return data
-
 
 def doFolder(folder,files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
-    norm='auto',save_pyfai=False,saveChi=True,poni='pyfai.poni',
-    storageFile='auto',save=True,logDict=None,dezinger=None,skip_first=0,last=None):
+    qlims=None,monitor='auto',save_pyfai=False,saveChi=True,poni='pyfai.poni',
+    storageFile='auto',save=True,logDict=None,dezinger=None,skip_first=0,
+    last=None):
   """ calc 1D curves from files in folder, returning a dictionary of stuff
       nQ    : number of Q-points (equispaced)
+      monitor: normalization array (or list for q range normalization)
       force : if True, redo from beginning even if previous data are found
               if False, do only new files
       mask  : can be a list of [filenames|array of booleans|mask string]
@@ -247,7 +231,16 @@ def doFolder(folder,files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
               → a dictionary (use to bootstrap an AzimuthalIntegrator using 
                 AzimuthalIntegrator(**poni)
  """
+
+  func = inspect.currentframe()
+  args = inspect.getargvalues(func)
+  # store argument for saving ..
+  args = dict( [(arg,args.locals[arg]) for arg in args.args] )
+  if isinstance(args['poni'],pyFAI.AzimuthalIntegrator):
+    args['poni'] = ai_as_dict(args['poni'])
+    
   if storageFile == 'auto': storageFile = folder + "/" + "pyfai_1d.h5"
+
 
   if os.path.isfile(storageFile) and not force:
     saved = DataStorage(storageFile)
@@ -258,6 +251,14 @@ def doFolder(folder,files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
   files = utils.getFiles(folder,files)
   if logDict is not None:
     files = [f for f in files if utils.getBasename(f) in logDict['file'] ]
+
+    # sometime one deletes images but not corresponding lines in logfiles...
+    if len(files)<len(logDict['file']):
+      basenames = np.asarray( [ utils.getBasename(file) for file in files] )
+      idx_to_keep = np.asarray([f in basenames for f in logDict['file']] )
+      for key in logDict.keys(): logDict[key] = logDict[key][idx_to_keep]
+      log.warn("More files in log than actual images, truncating loginfo")
+      
   files = files[skip_first:last]
 
 
@@ -278,6 +279,7 @@ def doFolder(folder,files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
       
     data   = np.empty( (len(files),nQ) )
     err    = np.empty( (len(files),nQ) )
+    pbar = utils.progressBar(len(files))
     for ifname,fname in enumerate(files):
       img = read(fname)
       q,i,e = do1d(ai,img,mask=mask,npt_radial=nQ,dark=dark,dezinger=dezinger)
@@ -286,46 +288,77 @@ def doFolder(folder,files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
       if saveChi:
         chi_fname = utils.removeExt(fname) + ".chi"
         utils.saveTxt(chi_fname,q,np.vstack((i,e)),info=ai_as_str(ai),overwrite=True)
-
+      pbar.update(ifname+1)
+    pbar.finish()
     if saved is not None:
-      files = np.concatenate( (saved["files"] ,basenames ) )
-      data  = np.concatenate( (saved["data"]  ,data  ) )
-      err   = np.concatenate( (saved["err"]   ,err   ) )
+      files = np.concatenate( (saved.orig.files  ,basenames ) )
+      data  = np.concatenate( (saved.orig.data ,data  ) )
+      err   = np.concatenate( (saved.orig.err  ,err   ) )
     theta_rad = utils.qToTheta(q,wavelength=ai.wavelength)
     theta_deg = utils.qToTheta(q,wavelength=ai.wavelength,asDeg=True)
-    orig = dict(data=data.copy(),err=err.copy(),q=q.copy())
-    ret = dict(q=q,folder=folder,files=files,data=data,err=err,
-          orig = orig, theta_rad = theta_rad, theta_deg=theta_deg,
-          pyfai=ai_as_dict(ai),pyfai_info=ai_as_str(ai),mask=mask)
+    orig = dict(data=data.copy(),err=err.copy(),q=q.copy(),theta_deg=theta_deg,
+           theta_rad=theta_rad,files=files)
+    ret = dict(folder=folder,files=files,orig = orig,pyfai=ai_as_dict(ai),
+          pyfai_info=ai_as_str(ai),mask=mask,args=args)
     if not save_pyfai:
       ret['pyfai']['chia'] = None
       ret['pyfai']['dssa'] = None
       ret['pyfai']['q']    = None
       ret['pyfai']['ttha'] = None
  
-
     ret = DataStorage(ret)
 
-    # add info from logDict if provided
-    if logDict is not None:
-      ret['log']=logDict
     # sometime saving is not necessary (if one has to do it after subtracting background
     if storageFile is not None and save: ret.save(storageFile)
   else:
     ret = saved
+
+  if qlims is not None:
+    idx = (ret.orig.q>=qlims[0]) & (ret.orig.q<=qlims[1])
+  else:
+    idx = np.ones_like(ret.orig.q,dtype=bool)
+
+  ret.data = ret.orig.data[:,idx]
+  ret.err  = ret.orig.err[:,idx]
+  ret.q    = ret.orig.q[idx]
+  ret.theta_rad = ret.orig.theta_rad
+  ret.theta_deg = ret.orig.theta_deg
+
+  if monitor == 'auto':
+    monitor = ret.data.mean(1)
+  elif isinstance(monitor,(tuple,list)):
+    idx_norm = (ret.q >= monitor[0]) & (ret.q <= monitor[1])
+    monitor = ret.data[:,idx_norm].mean(1)
+  ret["data_norm"] = ret.data/monitor[:,np.newaxis]
+  ret["err_norm"] = ret.err/monitor[:,np.newaxis]
+  ret["monitor"] = monitor[:,np.newaxis]
+
+  # add info from logDict if provided
+  if logDict is not None: ret['log']=logDict
+
   return ret
 
 
-def removeBackground(data,qlims=(0,10),max_iter=30,background_regions=[],
+def removeBackground(data,qlims=(0,10),max_iter=30,background_regions=[],force=False,
       storageFile=None,save=True,**removeBkg):
   """ similar function to the zray.utils one, this works on dataset created by
       doFolder """
-  idx = utils.findSlice(data.q,qlims)
-  data.q,data.data = utils.removeBackground(data.q[idx],data.data[:,idx],
-              max_iter=max_iter,background_regions=background_regions,**removeBkg)
-  data.err  = data.err[idx]
+  idx = utils.findSlice(data.orig.q,qlims)
+  # see if there are some to do ...
+  if force:
+    idx_start = 0
+  else:
+    idx_start = len(data.data)
+  if idx_start < len(data.orig.data):
+    _q,_data = utils.removeBackground(data.orig.q[idx],data.orig.data[:,idx],
+               max_iter=max_iter,background_regions=background_regions,**removeBkg)
+    data.q = _q
+    data.data  = np.concatenate( (data.data,_data  ) )
+    data.err   = np.concatenate( (data.err ,data.err[idx_start,idx]   ) )
   if save: data.save(storageFile); # if None uses .filename
   return data
+
+
 
 def _calc_R(x,y, xc, yc):
   """ calculate the distance of each 2D points from the center (xc, yc) """
