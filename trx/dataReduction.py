@@ -153,7 +153,7 @@ def averageScanPoints(scan,data,errAbs=None,isRef=None,lpower=None,
 
 
 def calcTimeResolvedSignal(scan,data,err=None,reference="min",q=None,
-    monitor=None,saveTxt=True,folder="./",**kw):
+    monitor=None,saveTxt=True,folder=os.curdir,**kw):
   """
     reference: can be 'min', 'max', a float|integer or an array of booleans
     data     : >= 2dim array (first index is image number)
@@ -189,15 +189,16 @@ def saveTxt(folder,data,delayToStr=True,basename='auto',info="",**kw):
   # the abspath is needed in case we analyze the "./"
   folder = os.path.abspath(folder);
   if basename == 'auto':
-      basename = "_".join(folder.rstrip("/").split("/")[-2:]) + "_"
+      sep = os.path.sep
+      basename = "_".join(folder.rstrip(sep).split(sep)[-2:]) + "_"
   q = data.q if "q" in data else np.arange(data.diff.shape[-1])
   # save one file with all average diffs
-  fname = "%s/%sdiff_av_matrix.txt" % (folder,basename)
+  fname = os.path.join(folder,"%sdiff_av_matrix.txt" %basename)
   utils.saveTxt(fname,q,data.diff,headerv=data.scan,**kw)
-  fname = "%s/%sdiff_plus_ref_av_matrix.txt" % (folder,basename)
+  fname = os.path.join(folder,"%sdiff_plus_ref_av_matrix.txt" %basename)
   utils.saveTxt(fname,q,data.diff_plus_ref,headerv=data.scan,**kw)
   # save error bars in the matrix form
-  fname = "%s/%sdiff_av_matrix_err.txt" % (folder,basename)
+  fname = os.path.join(folder,"%sdiff_av_matrix_err.txt" % basename)
   utils.saveTxt(fname,q,data.err,headerv=data.scan,**kw)
 
   for iscan,scan in enumerate(data.scan):
@@ -216,7 +217,7 @@ def saveTxt(folder,data,delayToStr=True,basename='auto',info="",**kw):
       info_delay = info
 
     # save one file per timedelay with average diff (and err)
-    fname = "%s/%sdiff_av_%s.txt" % (folder,basename,scan)
+    fname = os.path.join(folder,"%sdiff_av_%s.txt" %(basename,scan))
 #    if 'mask' in data:
 #      tosave = np.vstack( (data.diff[iscan],data.err[iscan],
 #               data.dataUnmasked[iscan],data.errUnmasked[iscan] ) )
@@ -227,38 +228,5 @@ def saveTxt(folder,data,delayToStr=True,basename='auto',info="",**kw):
     utils.saveTxt(fname,q,tosave,info=info_delay,columns=columns)
 
     # save one file per timedelay with all diffs for given delay
-    fname = "%s/%sdiffs_%s.txt" % (folder,basename,scan)
+    fname = os.path.join(folder,"%sdiffs_%s.txt" % (basename,scan))
     utils.saveTxt(fname,q,data.diffs_in_scan[iscan],info=info_delay,**kw)
-
-
-def read_diff_av(folder,plot2D=False,save=None):
-  print("Never tested !!!")
-  basename = folder+"/"+"diff_av*"
-  files = glob.glob(basename)
-  files.sort()
-  if len(files) == 0:
-    print("No file found (basename %s)" % basename)
-    return None
-  temp   = [os.path.basename(f[:-4]) for f in files]
-  delays = [f.split("_")[-1] for f in temp ]
-  diffav = collections.OrderedDict()
-  diffs  = collections.OrderedDict()
-  for d,f in zip(delays,files):
-    data = np.loadtxt(f)
-    diffav[d]=data[:,1]
-    diffs[d] = np.loadtxt(folder+"/diffs_%s.dat"%d)[:,1:]
-    q     =data[:,0]
-  t = np.asarray( [mc.strToTime(ti) for ti in delays] )
-  if plot2D:
-    idx = t>0
-    i = np.asarray( diffav.values() )
-    plt.pcolor(np.log10(t[idx]),q,i[idx].T)
-    plt.xlabel(r"$\log_{10}(t)$")
-    plt.ylabel(r"q ($\AA^{-1}$)")
-  it=np.asarray(diffav.values())
-  if save:
-    tosave = np.vstack( (q,it) )
-    header = np.hstack( (len(it),t) )
-    tosave = np.vstack( (header,tosave.T)  )
-    np.savetxt(folder + "/all_diffs_av_matrix.txt",tosave)
-  return q,it,diffs,t
