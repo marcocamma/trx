@@ -27,7 +27,7 @@ _time_regex =      re.compile( "(-?\d+\.?\d*(?:ps|ns|us|ms)?)")
 _timeInStr_regex = re.compile("_(-?\d+\.?\d*(?:ps|ns|us|ms)?)")
 
 def getFiles(folder,basename="*.edf*",nFiles=None):
-  files = glob.glob(folder + "/" + basename)
+  files = glob.glob(os.path.join(folder,basename))
   files.sort()
   if nFiles is not None: files = files[:nFiles]
   return files
@@ -292,14 +292,14 @@ def radToQ(theta,**kw):
   assert not ("E" in kw and "wavelength" in kw),\
     "conflicting arguments (E and wavelength)"
   if "E" in kw: kw["wavelength"] = 12.398/kw["E"]
-  return 4*np.pi/kw["wavelength"]*np.sin(theta)
+  return 4*np.pi/kw["wavelength"]*np.sin(theta/2)
 
 def degToQ(theta,**kw):
   theta = theta/180.*np.pi
   return radToQ(theta,**kw)
 degToQ.__doc__ = radToQ.__doc__
 
-def qToTheta(q,asDeg=False,**kw):
+def qToTwoTheta(q,asDeg=False,**kw):
   """ Return scattering angle from q (given E or wavelength) """
   # Energy or wavelength should be in kw
   assert "E" in kw or "wavelength" in kw,\
@@ -308,7 +308,7 @@ def qToTheta(q,asDeg=False,**kw):
   assert not ("E" in kw and "wavelength" in kw),\
     "conflicting arguments (E and wavelength)"
   if "E" in kw: kw["wavelength"] = 12.398/kw["E"]
-  theta = np.arcsin(q*kw["wavelength"]/4/np.pi)
+  theta = 2*np.arcsin(q*kw["wavelength"]/4/np.pi)
   if asDeg: theta = np.rad2deg(theta)
   return theta
 
