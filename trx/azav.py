@@ -64,6 +64,18 @@ def ai_as_str(ai):
       "# rot[1,2,3] [rad]: %.3f,%.3f,%.3f" % (ai.rot1,ai.rot2,ai.rot3) ]
   return "\n".join(s)
 
+def dezinger(ai, imgs, mask = None, npt_radial = 600, method = 'csr',dezinger=50):
+  """ ai is a pyFAI azimuthal intagrator 
+              it can be defined with pyFAI.load(ponifile)
+        dezinger: None or float (used as percentile of ai.separate)
+        mask: True are points to be masked out """
+  if dezinger is None or dezinger <= 0: return imgs
+  if imgs.ndim == 2: imgs=imgs[np.newaxis,:]
+  for iimg,img in enumerate(imgs):
+    _,imgs[iimg]=ai.separate(imgs[iimg],npt_rad=npt_radial,npt_azim=512,
+                 unit='q_A^-1',method=method,mask=mask,percentile=dezinger)
+  return np.squeeze(imgs)
+
 def do1d(ai, imgs, mask = None, npt_radial = 600, method = 'csr',safe=True,dark=10., polCorr = 1,dezinger=None):
     """ ai is a pyFAI azimuthal intagrator 
               it can be defined with pyFAI.load(ponifile)
@@ -76,8 +88,8 @@ def do1d(ai, imgs, mask = None, npt_radial = 600, method = 'csr',safe=True,dark=
     out_s = np.empty( ( len(imgs), npt_radial) )
     for _i,img in enumerate(imgs):
       if dezinger is not None and dezinger > 0:
-        _,img=ai.separate(img,npt_rad=npt_radial,npt_azim=512,unit='q_A^-1',
-              method=method,mask=mask,percentile=dezinger)
+        img=dezinger(ai,img,npt_radial=npt_radial,mask=mask,
+                     dezinger=dezinger,method=method)
       q,i, sig = ai.integrate1d(img-dark, npt_radial, mask= mask, safe = safe,\
                  unit="q_A^-1", method = method, error_model = "poisson",
                  polarization_factor = polCorr)
@@ -106,9 +118,10 @@ def getAI(poni=None,folder=None,**kwargs):
         in this case if folder is given it is used (together with all its 
         subfolder) as search path (along with ./ and home folder)
       → kwargs if present can be used to define (or override) parameters from files,
-        dist,xcen,ycen,poni1,poni2,rot1,rot2,rot3,pixel1,pixel2,splineFile,
-        detector,wavelength
+        dist,xcen,ycen,poni1,poni2,rot1,rot2,rot3,pixel,pixel1,pixel2,
+        splineFile,detector,wavelength
   """
+  if isinstance(poni,dict): kwargs = poni
   if isinstance(poni,pyFAI.azimuthalIntegrator.AzimuthalIntegrator):
     ai = poni
   elif isinstance(poni,str):
@@ -124,11 +137,11 @@ def getAI(poni=None,folder=None,**kwargs):
         path = pathlib.Path(temp)
         folders = [ str(path), ]
         for p in path.parents: folders.append(str(p))
-      folders.append( "./" )
-      folders.append( os.path.expanduser("~/") )
+      folders.append( os.curdir )
+      folders.append( os.path.expanduser("~") )
       # look for file
       for path in folders:
-        fname = path + "/" + poni
+        fname = os.path.join(path,poni)
         if os.path.isfile(fname):
           log.info("Found poni file %s",fname)
           break
@@ -140,6 +153,8 @@ def getAI(poni=None,folder=None,**kwargs):
   for par,value in kwargs.items(): setattr(ai,par,value)
   # provide xcen and ycen for convenience (note: xcen changes poni2
   # and ycen changes poni1)
+  if 'pixel' in kwargs: ai.pixel1 = kwargs['pixel']
+  if 'pixel' in kwargs: ai.pixel2 = kwargs['pixel']
   if 'xcen' in kwargs: ai.poni2 = kwargs['xcen'] * ai.pixel2
   if 'ycen' in kwargs: ai.poni1 = kwargs['ycen'] * ai.pixel1
   ai.reset(); # needed in case of overridden parameters
@@ -239,7 +254,7 @@ def doFolder(folder,files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
   if isinstance(args['poni'],pyFAI.AzimuthalIntegrator):
     args['poni'] = ai_as_dict(args['poni'])
     
-  if storageFile == 'auto': storageFile = folder + "/" + "pyfai_1d.h5"
+  if storageFile == 'auto': storageFile = os.path.join(folder,"pyfai_1d.h5")
 
 
   if os.path.isfile(storageFile) and not force:
@@ -294,10 +309,10 @@ def doFolder(folder,files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
       files = np.concatenate( (saved.orig.files  ,basenames ) )
       data  = np.concatenate( (saved.orig.data ,data  ) )
       err   = np.concatenate( (saved.orig.err  ,err   ) )
-    theta_rad = utils.qToTheta(q,wavelength=ai.wavelength)
-    theta_deg = utils.qToTheta(q,wavelength=ai.wavelength,asDeg=True)
-    orig = dict(data=data.copy(),err=err.copy(),q=q.copy(),theta_deg=theta_deg,
-           theta_rad=theta_rad,files=files)
+    twotheta_rad = utils.qToTwoTheta(q,wavelength=ai.wavelength)
+    twotheta_deg = utils.qToTwoTheta(q,wavelength=ai.wavelength,asDeg=True)
+    orig = dict(data=data.copy(),err=err.copy(),q=q.copy(),
+           twotheta_deg=twotheta_deg,twotheta_rad=twotheta_rad,files=files)
     ret = dict(folder=folder,files=files,orig = orig,pyfai=ai_as_dict(ai),
           pyfai_info=ai_as_str(ai),mask=mask,args=args)
     if not save_pyfai:
@@ -321,8 +336,8 @@ def doFolder(folder,files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
   ret.data = ret.orig.data[:,idx]
   ret.err  = ret.orig.err[:,idx]
   ret.q    = ret.orig.q[idx]
-  ret.theta_rad = ret.orig.theta_rad
-  ret.theta_deg = ret.orig.theta_deg
+  ret.twotheta_rad = ret.orig.twotheta_rad
+  ret.twotheta_deg = ret.orig.twotheta_deg
 
   if monitor == 'auto':
     monitor = ret.data.mean(1)
@@ -466,7 +481,7 @@ def chiPlot(fname,useTheta=False,E=12.4):
 
 
 def chiAverage(folder,basename="",scale=1,norm=None,returnAll=False,plot=False,showTrend=False,clim='auto'):
-  files = glob.glob("%s/%s*chi"%(folder,basename))
+  files = glob.glob(os.path.joint(folder,"%s*chi"%basename))
   files.sort()
   print(files)
   if len(files) == 0:
