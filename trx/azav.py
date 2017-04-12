@@ -81,6 +81,7 @@ def do1d(ai, imgs, mask = None, npt_radial = 600, method = 'csr',safe=True,dark=
               it can be defined with pyFAI.load(ponifile)
         dezinger: None or float (used as percentile of ai.separate)
         mask: True are points to be masked out """
+    if isinstance(ai,dict): ai = getAI(ai)
     # force float to be sure of type casting for img
     if isinstance(dark,int): dark = float(dark);
     if imgs.ndim == 2: imgs = (imgs,)
@@ -209,6 +210,7 @@ def interpretMask(masks,shape=None):
     *  an existing filename
     *  a string like [x|y] [<|>] int;
   """
+  if isinstance(masks,np.ndarray): return masks.astype(bool)
   if not isinstance( masks, (list,tuple,np.ndarray) ):
     masks = (masks,)
   masks = [_interpretMask(mask,shape) for mask in masks]
@@ -251,6 +253,8 @@ def doFolder(folder,files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
   args = inspect.getargvalues(func)
   # store argument for saving ..
   args = dict( [(arg,args.locals[arg]) for arg in args.args] )
+
+  folder = folder.replace("//","/").rstrip("/")
   if isinstance(args['poni'],pyFAI.AzimuthalIntegrator):
     args['poni'] = ai_as_dict(args['poni'])
     
@@ -278,7 +282,7 @@ def doFolder(folder,files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
 
 
   if saved is not None:
-    files = [f for f in files if f not in saved["files"]]
+    files = [f for f in files if utils.getBasename(f) not in saved["files"]]
   log.info("Will do azimuthal integration for %d files"%(len(files)))
 
   files = np.asarray(files)
@@ -309,6 +313,8 @@ def doFolder(folder,files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
       files = np.concatenate( (saved.orig.files  ,basenames ) )
       data  = np.concatenate( (saved.orig.data ,data  ) )
       err   = np.concatenate( (saved.orig.err  ,err   ) )
+    else:
+      files = basenames
     twotheta_rad = utils.qToTwoTheta(q,wavelength=ai.wavelength)
     twotheta_deg = utils.qToTwoTheta(q,wavelength=ai.wavelength,asDeg=True)
     orig = dict(data=data.copy(),err=err.copy(),q=q.copy(),
@@ -323,10 +329,10 @@ def doFolder(folder,files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
  
     ret = DataStorage(ret)
 
-    # sometime saving is not necessary (if one has to do it after subtracting background
-    if storageFile is not None and save: ret.save(storageFile)
   else:
     ret = saved
+
+  if ret is None: return None
 
   if qlims is not None:
     idx = (ret.orig.q>=qlims[0]) & (ret.orig.q<=qlims[1])
@@ -350,6 +356,9 @@ def doFolder(folder,files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
 
   # add info from logDict if provided
   if logDict is not None: ret['log']=logDict
+    # sometime saving is not necessary (if one has to do it after subtracting background
+  if storageFile is not None and save: ret.save(storageFile)
+
 
   return ret
 
