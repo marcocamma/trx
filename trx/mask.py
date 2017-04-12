@@ -10,6 +10,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.path import Path
 
+from . import azav
+
 maskComponent = collections.namedtuple('maskComponent',['operation','geometry','vertices'])
 
 def _rectangleToMask(X,Y,vertices):
@@ -125,6 +127,7 @@ def getPoints(N=1,shape=(100,100),snapRange=0):
 
 def makeMaskGui(img,snapRange=60):
   """ snapRange controls border snapping (in pixels, use <= 0 to disable """
+  if isinstance(img,str): img = azav.read(img)
   mask = MyMask(img)
   ans='ok'
   while (ans != 'done'):
