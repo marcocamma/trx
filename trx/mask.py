@@ -1,3 +1,11 @@
+""" 
+    Module to handle masks: it defines:
+
+      - Mask: a mask object with command line methods: addPolygon, etc
+      - makeMaskGui: a GUI based way of creating masks
+      - maskBorder: to mask the borders of an array
+      - maskCenterLines: to mask the central lines (good for multi-panel det)
+"""
 from __future__ import print_function
 import sys
 if sys.version_info.major == 2: input=raw_input
@@ -32,9 +40,26 @@ def _polygonToMask(X,Y,vertices):
     grid = path.contains_points(points)
     return grid.reshape(X.shape)
 
-class MyMask(object):
+class Mask(object):
+  """ class for making masks. True are pixels masked OUT.
+
+      This class provides methods for adding/subtracting components in the
+      for of rectangles, circles, polygons. Each addition/subtraction is 
+      stored as 'operations' that are then applied on request.
+      
+      Parameters
+      ----------
+      img: {array,filename,shape of array}
+          img to use for calculation. Since only the shape is used a shape-like
+          tuple can be provided
+
+
+  """
   def __init__(self,img=None):
     self.comp = []
+    if isinstance(img,str): img = azav.read(img)
+    # if img is not array at this point assume it is a shape-tuple
+    if not isinstance(img,np.ndarray): img = np.zeros( img, dtype=bool )
     self.img  = img
     self.mask = None
     self._cache = None
@@ -111,6 +136,7 @@ class MyMask(object):
     i.save(fname)
 
 def snap(point,shape,snapRange=20):
+  """ snap 'point' if within 'snapRange' from the border defined by 'shape' """
   snapped = list(point)
   if snapped[0] < snapRange: snapped[0] = 0
   if snapped[0] > shape[1]-snapRange: snapped[0] = shape[1]
@@ -125,14 +151,29 @@ def getPoints(N=1,shape=(100,100),snapRange=0):
   if len(c) == 1: c = c[0]
   return c
 
-def makeMaskGui(img,snapRange=60):
-  """ snapRange controls border snapping (in pixels, use <= 0 to disable """
+def makeMaskGui(img,snapRange=60,clim='auto'):
+  """ interactive, click based approach do define a mask.
+      
+      Parameters
+      ----------
+      snapRange : int
+          controls border snapping (in pixels) use <= 0 to disable;
+      clim: 'auto' or list(min,max)
+          controls color scale os image, if 'auto' uses 2%-98% percentile
+
+      Returns
+      -------
+      Mask
+          instance of the Mask class that allows to modify or save the mask
+
+  """
   if isinstance(img,str): img = azav.read(img)
-  mask = MyMask(img)
+  mask = Mask(img)
+  if clim == "auto": clim = np.percentile(img,(2,98))
   ans='ok'
   while (ans != 'done'):
     plt.imshow(img)
-    plt.clim(np.percentile(img,(2,98)))
+    plt.clim(clim)
     plt.imshow(mask.getMatplotlibMask())
     plt.pause(0.01)
     ans = input("What's next p/P/c/C/r/R/done? (capitals = subtract)")
@@ -178,6 +219,20 @@ def makeMaskGui(img,snapRange=60):
     return mask
     
 def maskBorder(width,shape):
+  """ mask the border of an array for a given width
+      
+      Parameters
+      ----------
+      width : int
+          the width of the region to mask (>0)
+
+      Returns
+      -------
+      boolean (False/True) array
+          True are the pixels masked out
+  """
+  assert isinstance(width,int), "width has to be integer"
+  assert width>0, "width has to be positive"
   mask = np.zeros(shape,dtype=bool)
   mask[ :width  ,   :     ] = True
   mask[ -width: ,   :     ] = True
@@ -186,6 +241,20 @@ def maskBorder(width,shape):
   return mask
 
 def maskCenterLines(width,shape):
+  """ mask a cross going trough the center of the array for a given width
+      
+      Parameters
+      ----------
+      width : int
+          the width of the region to mask (>0)
+
+      Returns
+      -------
+      boolean (False/True) array
+          True are the pixels masked out
+  """
+  assert isinstance(width,int), "width has to be integer"
+  assert width>0, "width has to be positive"
   mask = np.zeros(shape,dtype=bool)
   if isinstance(width,int): width = (width,width)
   c0 = int(shape[0]/2)
@@ -198,7 +267,8 @@ def maskCenterLines(width,shape):
 
 
 def test(shape=(1000,2000)):
-  mask = MyMask()
+  """ Make a simple mask programmatically """
+  mask = Mask()
   mask.addCircle(400,300,250)
   mask.subtractCircle(400,300,150)
   mask.addRectangle(350,250,1500,700)
