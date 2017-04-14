@@ -231,8 +231,14 @@ def doFolder(folder="./",files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
   # can't store aritrary objects
   if isinstance(args['poni'],pyFAI.AzimuthalIntegrator):
     args['poni'] = ai_as_dict(args['poni'])
-    
-  if storageFile == 'auto': storageFile = os.path.join(folder,"pyfai_1d.h5")
+
+  if storageFile == 'auto':
+    fname = "pyfai_1d" + default_extension
+    if not os.path.isdir(folder): 
+      # do not overide folder, it might be useful
+      storageFile = os.path.join( ".",fname)
+    else:
+      storageFile = os.path.join(folder,fname)
 
   if os.path.isfile(storageFile) and not force:
     saved = DataStorage(storageFile)
