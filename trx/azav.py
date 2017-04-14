@@ -14,6 +14,7 @@ import pathlib
 from datastorage import DataStorage
 from . import utils
 from . import filters
+from .mask import interpretMasks
 import re
 import fabio
 import pyFAI
@@ -122,7 +123,12 @@ def getAI(poni=None,folder=None,**kwargs):
         dist,xcen,ycen,poni1,poni2,rot1,rot2,rot3,pixel,pixel1,pixel2,
         splineFile,detector,wavelength
   """
-  if isinstance(poni,dict): kwargs = poni
+  if isinstance(poni,dict):
+    kwargs = poni
+    _def_names = ["poni1","poni2","pixel1","pixel2","dist","wavelength",\
+                "rot1","rot2","rot3","xcen","ycen","pixel"]
+    kwargs = dict( (name,value) for (name,value) in poni.items() \
+             if name in _def_names )
   if isinstance(poni,pyFAI.azimuthalIntegrator.AzimuthalIntegrator):
     ai = poni
   elif isinstance(poni,str):
@@ -148,122 +154,98 @@ def getAI(poni=None,folder=None,**kwargs):
           break
         else:
           log.debug("Could not poni file %s",fname)
-    ai = pyFAI.load(fname)
+    ai = pyFAI.load(fname) if os.path.isfile(fname) else None
   else:
     ai = pyFAI.azimuthalIntegrator.AzimuthalIntegrator()
-  for par,value in kwargs.items(): setattr(ai,par,value)
-  # provide xcen and ycen for convenience (note: xcen changes poni2
-  # and ycen changes poni1)
-  if 'pixel' in kwargs: ai.pixel1 = kwargs['pixel']
-  if 'pixel' in kwargs: ai.pixel2 = kwargs['pixel']
-  if 'xcen' in kwargs: ai.poni2 = kwargs['xcen'] * ai.pixel2
-  if 'ycen' in kwargs: ai.poni1 = kwargs['ycen'] * ai.pixel1
-  ai.reset(); # needed in case of overridden parameters
+  if ai is not None:
+    for par,value in kwargs.items(): setattr(ai,par,value)
+    # provide xcen and ycen for convenience (note: xcen changes poni2
+    # and ycen changes poni1)
+    if 'pixel' in kwargs: ai.pixel1 = kwargs['pixel']
+    if 'pixel' in kwargs: ai.pixel2 = kwargs['pixel']
+    if 'xcen' in kwargs: ai.poni2 = kwargs['xcen'] * ai.pixel2
+    if 'ycen' in kwargs: ai.poni1 = kwargs['ycen'] * ai.pixel1
+    ai.reset(); # needed in case of overridden parameters
+  else:
+    log.warn("Could not find poni")
   return ai
 
-g_mask_str = re.compile("(\w)\s*(<|>)\s*(\d+)")
-
-def _interpretMask(mask,shape=None):
-  """
-    if mask is an existing filename, returns it
-    if mask is a string like [x|y] [<|>] int;
-      for example y>500 will dis-regard out for y>500
-  """
-  maskout = None
-  if isinstance(mask,str) and os.path.isfile(mask):
-    maskout = read(mask).astype(np.bool)
-  elif isinstance(mask,str) and not os.path.isfile(mask):
-    err_msg = ValueError("The string '%s' could not be interpreted as simple\
-              mask; it should be something like x>10"%mask)
-    assert shape is not None, "_interpretMask needs a shape to interpret a string"
-    # interpret string
-    maskout = np.zeros(shape,dtype=bool)
-    match = g_mask_str.match(mask)
-    if match is None: raise err_msg
-    (axis,sign,lim) = match.groups()
-    if axis not in ("x","y"): raise err_msg
-    if sign not in (">","<"): raise err_msg
-    lim = int(lim)
-    idx = slice(lim,None) if sign == ">" else slice(None,lim)
-    if axis == 'y':
-      maskout[idx,:] = True
-    else:
-      maskout[:,idx] = True
-  elif isinstance(mask,np.ndarray):
-    maskout = mask.astype(np.bool)
-  elif mask is None:
-    assert shape is not None, "_interpretMask needs a shape to interpret a string"
-    maskout = np.zeros(shape,dtype=bool)
-  else:
-    maskout = None
-    raise ValueError("Could not interpret %s as mask input"%mask)
-
-  if shape is not None and maskout.shape != shape:
-    raise ValueError("The mask shape %s does not match the shape given as\
-      argument %s"%(maskout.shape,shape))
-  return maskout
-
-
-def interpretMask(masks,shape=None):
-  """
-    if masks is a list of masks, eachone can be:
-    *  an existing filename
-    *  a string like [x|y] [<|>] int;
-  """
-  if isinstance(masks,np.ndarray): return masks.astype(bool)
-  if not isinstance( masks, (list,tuple,np.ndarray) ):
-    masks = (masks,)
-  masks = [_interpretMask(mask,shape) for mask in masks]
-  # put them all together
-  mask = masks[0]
-  for m in masks[1:]:
-    mask = np.logical_or(mask,m)
-  return mask
-
-
-def doFolder(folder,files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
+def doFolder(folder="./",files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
     qlims=None,monitor='auto',save_pyfai=False,saveChi=True,poni='pyfai.poni',
     storageFile='auto',save=True,logDict=None,dezinger=None,skip_first=0,
     last=None):
-  """ calc 1D curves from files in folder, returning a dictionary of stuff
-      nQ    : number of Q-points (equispaced)
-      monitor: normalization array (or list for q range normalization)
-      force : if True, redo from beginning even if previous data are found
-              if False, do only new files
-      mask  : can be a list of [filenames|array of booleans|mask string]
-              pixels that are True are dis-regarded
-      saveChi: self-explanatory
-      dezinger: None or 0 to disable; good value is ~50. Needs good center and mask
-      logDict: dictionary(-like) structure. has to have 'file' key
-      save_pyfai: store all pyfai's internal arrays (~110 MB)
-      poni  : could be:
-              → an AzimuthalIntegrator instance
-              → a filename that will be look for in
-                 1 'folder' first
-                 2 in ../folder
-                 3 in ../../folder
-                 ....
-                 n-1 in pwd
-                 n   in homefolder
-              → a dictionary (use to bootstrap an AzimuthalIntegrator using 
-                AzimuthalIntegrator(**poni)
+  """ calculate 1D curves from files in folder
+
+      Parameters
+      ----------
+      folder : str
+          folder to work on
+      files : str
+          regular expression to look for ccd images (use edf* for including
+          gzipped giles)
+      nQ : int
+          number of Q-points (equispaced)
+      monitor : array or (qmin,qmax)
+          normalization array (or list for q range normalization)
+      force : True|False
+          if True, redo from beginning even if previous data are found
+          if False, do only new files
+      mask : can be a list of [filenames|array of booleans|mask string]
+          pixels that are True are dis-regarded
+      saveChi : True|False
+          if False, chi files (text based for each image) are not saved
+      dezinger : None or 0<float<100
+          use pyfai function 'separate' to remove zingers. The value is the 
+          percentile used to find the liquicd baseline, 50 (i.e. median value)
+          if a good approximation. Dezinger takes ~200ms per 4M pixel image.
+          Needs good center and mask
+      logDict : None or dictionary(-like)
+          each key is a field. if given it has to have 'file' key
+      poni : informationation necessary to build an AzimuthalIntegrator:
+          → an AzimuthalIntegrator instance
+          → a filename that will be look for in
+               1 'folder' first
+               2 in ../folder
+               3 in ../../folder
+               ....
+               n-1 in pwd
+               n   in homefolder
+          → a dictionary (use to bootstrap an AzimuthalIntegrator using 
+              AzimuthalIntegrator(**poni)
+      save_pyfai : True|False
+          if True, it stores all pyfai's internal arrays (~110 MB)
+      skip_first : int
+          skip the first images (the first one is sometime not ideal)
+      last : int
+          skip evey image after 'last'
  """
 
   func = inspect.currentframe()
   args = inspect.getargvalues(func)
+  files_reg = files
   # store argument for saving ..
   args = dict( [(arg,args.locals[arg]) for arg in args.args] )
 
   folder = folder.replace("//","/").rstrip("/")
+
+  # can't store aritrary objects
   if isinstance(args['poni'],pyFAI.AzimuthalIntegrator):
     args['poni'] = ai_as_dict(args['poni'])
     
   if storageFile == 'auto': storageFile = os.path.join(folder,"pyfai_1d.h5")
 
-
   if os.path.isfile(storageFile) and not force:
     saved = DataStorage(storageFile)
     log.info("Found %d images in storage file"%saved.data.shape[0])
+    ai = getAI(poni,folder)
+    # consistency check (saved images done with same parameters ?)
+    if ai is not None:
+      if (saved.pyfai_info != ai_as_str(ai) or 
+          np.any( saved.mask != interpretMasks(mask,saved.mask.shape)) ) : 
+        log.warn("Found inconsistency between curves already saved and new ones")
+        log.warn("Redoing saved ones with new parameters")
+        args['force'] = True
+        saved = doFolder(**args)
   else:
     saved = None
 
@@ -291,10 +273,11 @@ def doFolder(folder,files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
   if len(files) > 0:
     # which poni file to use:
     ai = getAI(poni,folder)
-
+    _msg = "could not interpret poni info or find poni file"
+    if ai is None: raise ValueError(_msg)
 
     shape = read(files[0]).shape
-    mask = interpretMask(mask,shape)
+    mask = interpretMasks(mask,shape)
       
     data   = np.empty( (len(files),nQ) )
     err    = np.empty( (len(files),nQ) )

@@ -13,6 +13,7 @@ import logging
 log = logging.getLogger(__name__)
 
 import os
+import re
 import collections
 import numpy as np
 import matplotlib.pyplot as plt
@@ -263,6 +264,89 @@ def maskCenterLines(width,shape):
   w1 = int(width[1]/2)
   mask[ c0-w0:c0+w0  ,       :      ] = True
   mask[      :       ,  c1-w1:c1+w1 ] = True
+  return mask
+
+g_mask_str = re.compile("(\w)\s*(<|>)\s*(\d+)")
+
+def interpretMask(mask,shape=None):
+  """ Interpret 'mask' as a mask
+
+      Parameters
+      ----------
+      mask : filename or array or string like y>500
+
+      shape : array or tuple
+          needed to interpret y>500
+
+      Returns
+      -------
+      boolean (False/True) array
+          True are the pixels masked out
+  """
+  maskout = None
+  ## simplest case, an existing file
+  if isinstance(mask,str) and os.path.isfile(mask):
+    maskout = azav.read(mask).astype(np.bool)
+  ## mask string
+  elif isinstance(mask,str) and not os.path.isfile(mask):
+    if isinstance(shape,np.ndarray) : shape = shape.shape
+    err_msg = ValueError("The string '%s' could not be interpreted as simple\
+              mask; it should be something like x>10"%mask)
+    assert shape is not None, "_interpretMask needs a shape to interpret a string"
+    # interpret string
+    maskout = np.zeros(shape,dtype=bool)
+    match = g_mask_str.match(mask)
+    if match is None: raise err_msg
+    (axis,sign,lim) = match.groups()
+    if axis not in ("x","y"): raise err_msg
+    if sign not in (">","<"): raise err_msg
+    lim = int(lim)
+    idx = slice(lim,None) if sign == ">" else slice(None,lim)
+    if axis == 'y':
+      maskout[idx,:] = True
+    else:
+      maskout[:,idx] = True
+  elif isinstance(mask,np.ndarray):
+    maskout = mask.astype(np.bool)
+  elif mask is None:
+    assert shape is not None, "_interpretMask needs a shape to interpret a string"
+    maskout = np.zeros(shape,dtype=bool)
+  else:
+    maskout = None
+    raise ValueError("Could not interpret %s as mask input"%mask)
+  
+  if shape is not None and maskout.shape != shape:
+    raise ValueError("The mask shape %s does not match the shape given as\
+      argument %s"%(maskout.shape,shape))
+  return maskout
+
+def interpretMasks(masks,shape=None):
+  """ Interpret a single or a list of mask elements
+
+      Every element can be an array, a filename to read, a 'mask string'
+      (y>500). 
+
+      Parameters
+      ----------
+      masks : a 'mask element' or a list of mask elements
+
+      shape : array or tuple
+          needed to interpret y>500
+
+      Returns
+      -------
+      boolean (False/True) array
+          True are the pixels masked out
+ 
+  """
+  if isinstance(masks,np.ndarray): return masks.astype(bool)
+  # make iterable
+  if not isinstance( masks, (list,tuple,np.ndarray) ): masks = (masks,)
+  masks = [interpretMask(mask,shape) for mask in masks]
+  # put them all together
+  mask = masks[0]
+  for m in masks[1:]:
+    mask = np.logical_or(mask,m)
   return mask
 
 
