@@ -5,6 +5,8 @@
       - makeMaskGui: a GUI based way of creating masks
       - maskBorder: to mask the borders of an array
       - maskCenterLines: to mask the central lines (good for multi-panel det)
+      - interpretMask: interpret mask element (filename,y>500,array)
+      - interpretMasks: add up list of mask elements
 """
 from __future__ import print_function
 import sys
