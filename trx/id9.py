@@ -68,7 +68,7 @@ def findLogFile(folder):
   return logfile
 
 def readLogFile(fnameOrFolder,subtractDark=False,skip_first=0,
-    asDataStorage=True,last=None,srcur_min=80):
+    asDataStorage=True,last=None,srcur_min=30):
   """ read id9 style logfile """
   if os.path.isdir(fnameOrFolder):
     fname = findLogFile(fnameOrFolder)
@@ -134,7 +134,8 @@ def doFolder_azav(folder,nQ=1500,files='*.edf*',force=False,mask=None,
 
 
 def doFolder_dataRed(azavStorage,funcForAveraging=np.nanmean,
-                     outStorageFile='auto',reference='min',saveTxt=True):
+                     outStorageFile='auto',reference='min',chi2_0_max='auto',
+                     saveTxt=True):
   """ azavStorage if a DataStorage instance or the filename to read 
   """
 
@@ -154,19 +155,20 @@ def doFolder_dataRed(azavStorage,funcForAveraging=np.nanmean,
   # calculate differences
   tr = dataReduction.calcTimeResolvedSignal(azav.log.delay,azav.data_norm,
           err=azav.err_norm,q=azav.q,reference=reference,
-          funcForAveraging=funcForAveraging)
+          funcForAveraging=funcForAveraging,chi2_0_max=chi2_0_max)
 
+  tr.folder = folder
   if outStorageFile == 'auto':
+    if not os.path.isdir(folder): folder = "./"
     outStorageFile = folder + "/diffs" + default_extension
   tr.filename = outStorageFile
-  tr.folder = folder
 
   # save txt and npz file
   if saveTxt: dataReduction.saveTxt(folder,tr,info=azav.pyfai_info)
 
   tr.save(outStorageFile)
 
-  return azav,tr
+  return tr
 
 def doFolder(folder,azav_kw = dict(), datared_kw = dict(),online=True, retryMax=20,force=False):
   import matplotlib.pyplot as plt
@@ -182,7 +184,7 @@ def doFolder(folder,azav_kw = dict(), datared_kw = dict(),online=True, retryMax=
       azav = doFolder_azav(folder,**azav_kw)
       # check if there are new data
       if lastNum is None or lastNum<azav.data.shape[0]:
-        _,tr = doFolder_dataRed(azav,**datared_kw)
+        tr = doFolder_dataRed(azav,**datared_kw)
         if lines is None or len(lines) != tr.diff.shape[0]:
           lines,_ = utils.plotdiffs(tr,fig=fig,title=folder)
         else:

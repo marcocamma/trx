@@ -6,6 +6,7 @@ log = logging.getLogger(__name__)
 import numpy as np
 np.seterr(all='ignore')
 from . import utils
+from . import filters
 from datastorage import DataStorage
 import os
 
@@ -67,19 +68,40 @@ def subtractReferences(i,idx_ref, useRatio = False):
   return i
 
 def averageScanPoints(scan,data,errAbs=None,isRef=None,lpower=None,
-    useRatio=False,funcForAveraging=np.nanmean):
-  """ given scanpoints in 'scan' and corresponding data in 'data'
+    useRatio=False,funcForAveraging=np.nanmean,chi2_0_max='auto'):
+  """ Average data for equivalent values in 'scan' array
+
+      given scanpoints in 'scan' and corresponding data in 'data'
       average all data corresponding the exactly the same scanpoint.
       If the values in scan are coming from a readback, rounding might be
       necessary.
-      No normalization is done inside this function
-      if isRef is provided must be a boolean array of the same shape as 'scan'
-         is there is at least one scanpoint marked as True, the data are 
-         subtracted/divided by the interpolated reference
-      if lpower is provided the data is divided by it (how it is done depends
-         if one uses the ratio or not
-      funcForAveraging: is usually np.nanmean or np.nanmedian. it can be any 
-         function that support axis=0 as keyword argument
+
+      Parameters
+      ----------
+      scan : array(N)
+          array of scan points
+      data : array(N,M)
+          array of data to average, first axis correspond to scan index
+      errAbs : None or array as data
+          errbar for each data point. if None take the standard deviation 
+          over images in given scan point
+      isRef : None or array(N)
+          if None no reference is subtracted. if array, True indicate that 
+          a particular image is a reference one
+      lpower : None or array(N)
+          if not None, time resolved difference or ratio is normalized by it
+      useRatio : bool
+          use True if you want to calculate ratio ( I_{on}/I_{ref} ) instead
+          of I_{on} - I_{off}
+      funcForAveraging: function accepting axis=int keyword argument
+          is usually np.nanmean or np.nanmedian.
+      chi2_0_max = None, "auto" or float
+          simple chi2_0 threshold filter. use trx.filters for more advanced
+          ones. If auto, define max as 95% percentle. if None it is not applied
+
+      Returns
+      -------
+      DataStorage instance with all info
 """
   args = dict( isRef = isRef, lpower = lpower, useRatio = useRatio )
   data = data.astype(np.float)
@@ -116,6 +138,8 @@ def averageScanPoints(scan,data,errAbs=None,isRef=None,lpower=None,
   chi2_0 = []
   for i,t in enumerate(scan_pos):
     shot_idx = (scan == t)
+    if shot_idx.sum() == 0:
+      log.warn("No data to average for scan point %s"%str(t))
 
     # select data for the scan point
     diff_for_scan = diff_all[shot_idx]
@@ -149,6 +173,9 @@ def averageScanPoints(scan,data,errAbs=None,isRef=None,lpower=None,
         ref_average = ref_average, diff_plus_ref=diff+ref_average,
         average=average,median=median,args=args)
   ret = DataStorage(ret)
+  if chi2_0_max is not None:
+    ret = filters.chi2Filter(ret,threshold=chi2_0_max)
+    ret = filters.applyFilters(ret)
   return ret
 
 
