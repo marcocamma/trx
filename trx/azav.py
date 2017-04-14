@@ -65,7 +65,7 @@ def ai_as_str(ai):
       "# rot[1,2,3] [rad]: %.3f,%.3f,%.3f" % (ai.rot1,ai.rot2,ai.rot3) ]
   return "\n".join(s)
 
-def dezinger(ai, imgs, mask = None, npt_radial = 600, method = 'csr',dezinger=50):
+def dodezinger(ai, imgs, mask = None, npt_radial = 600, method = 'csr',dezinger=50):
   """ ai is a pyFAI azimuthal intagrator 
               it can be defined with pyFAI.load(ponifile)
         dezinger: None or float (used as percentile of ai.separate)
@@ -90,7 +90,7 @@ def do1d(ai, imgs, mask = None, npt_radial = 600, method = 'csr',safe=True,dark=
     out_s = np.empty( ( len(imgs), npt_radial) )
     for _i,img in enumerate(imgs):
       if dezinger is not None and dezinger > 0:
-        img=dezinger(ai,img,npt_radial=npt_radial,mask=mask,
+        img=dodezinger(ai,img,npt_radial=npt_radial,mask=mask,
                      dezinger=dezinger,method=method)
       q,i, sig = ai.integrate1d(img-dark, npt_radial, mask= mask, safe = safe,\
                  unit="q_A^-1", method = method, error_model = "poisson",
