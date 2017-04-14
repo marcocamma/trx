@@ -165,7 +165,7 @@ def volumeFraction(concentration=1,molWeight=17,density=1.347):
   return volume_fraction
 
 def plotdiffs(*args,select=None,err=None,absSignal=None,absSignalScale=10,
-              showErr=False,cmap=plt.cm.jet,fig=None,title=None):
+              showErr=False,cmap=plt.cm.jet,fig=None,title=None,plotDiffRef=False):
   # this selection trick done in this way allows to keep the same colors when 
   # subselecting (because I do not change the size of diffs)
   if isinstance(args[0],DataStorage):
@@ -199,7 +199,7 @@ def plotdiffs(*args,select=None,err=None,absSignal=None,absSignalScale=10,
     else:
       line = plt.plot(q,diffs[idiff],**kw)[0]
       lines_diff.append(line)
-      if diffs_abs is not None:
+      if diffs_abs is not None and plotDiffRef:
         line = plt.plot(q,diffs_abs[idiff],color=color)[0]
         lines_abs.append(line)
   if title is not None: fig.axes[0].set_title(title)
