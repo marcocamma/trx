@@ -5,7 +5,7 @@ def readme():
         return f.read()
 
 setup(name='trx',
-      version='0.2.4',
+      version='0.3.0',
       description='Tools for time resolved x-ray techniques',
       long_description=readme(),
       url='https://github.com/marcocamma/trx',
