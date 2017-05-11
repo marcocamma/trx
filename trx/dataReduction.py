@@ -133,7 +133,7 @@ def averageScanPoints(scan,data,errAbs=None,isRef=None,lpower=None,
 
   scan_pos = np.unique(scan)
   shape_out = [len(scan_pos),] + list(diff_all.shape[1:])
-  diff      = np.empty(shape_out)
+  diffs     = np.empty(shape_out)
   diff_err  = np.empty(shape_out)
   diffs_in_scan = []
   chi2_0 = []
@@ -156,22 +156,22 @@ def averageScanPoints(scan,data,errAbs=None,isRef=None,lpower=None,
     diffs_in_scan.append( diff_for_scan )
 
     # calculate average
-    diff[i] = funcForAveraging(diff_for_scan,axis=0)
+    diffs[i] = funcForAveraging(diff_for_scan,axis=0)
 
     # calculate chi2 of different repetitions
-    chi2 = np.power( (diff_for_scan - diff[i])/noise,2)
+    chi2 = np.power( (diff_for_scan - diffs[i])/noise,2)
     # sum over all axis but first
     for _ in range(diff_for_scan.ndim-1):
       chi2 = np.nansum( chi2, axis=-1 )
 
     # store chi2_0
-    chi2_0.append( chi2/diff[i].size )
+    chi2_0.append( chi2/diffs[i].size )
 
     # store error of mean
     diff_err[i] = noise/np.sqrt(shot_idx.sum())
-  ret = dict(scan=scan_pos,diff=diff,err=diff_err,
+  ret = dict(scan=scan_pos,diffs=diffs,err=diff_err,
         chi2_0=chi2_0,diffs_in_scan=diffs_in_scan,
-        ref_average = ref_average, diffs_plus_ref=diff+ref_average,
+        ref_average = ref_average, diffs_plus_ref=diffs+ref_average,
         average=average,median=median,args=args)
   ret = DataStorage(ret)
   if chi2_0_max is not None:
@@ -219,7 +219,7 @@ def saveTxt(folder,data,delayToStr=True,basename='auto',info="",**kw):
   if basename == 'auto':
       sep = os.path.sep
       basename = "_".join(folder.rstrip(sep).split(sep)[-2:]) + "_"
-  q = data.q if "q" in data else np.arange(data.diff.shape[-1])
+  q = data.q if "q" in data else np.arange(data.diffs.shape[-1])
   # save one file with all average diffs
   fname = os.path.join(folder,"%sdiff_av_matrix.txt" %basename)
   utils.saveTxt(fname,q,data.diff,headerv=data.scan,**kw)
@@ -247,11 +247,11 @@ def saveTxt(folder,data,delayToStr=True,basename='auto',info="",**kw):
     # save one file per timedelay with average diff (and err)
     fname = os.path.join(folder,"%sdiff_av_%s.txt" %(basename,scan))
 #    if 'mask' in data:
-#      tosave = np.vstack( (data.diff[iscan],data.err[iscan],
+#      tosave = np.vstack( (data.diffs[iscan],data.err[iscan],
 #               data.dataUnmasked[iscan],data.errUnmasked[iscan] ) )
 #      columns = 'q diffmask errmask diffnomask errnomask'.split()
 #    else:
-    tosave = np.vstack( (data.diff[iscan],data.err[iscan] ) )
+    tosave = np.vstack( (data.diffs[iscan],data.err[iscan] ) )
     columns = 'q diff err'.split()
     utils.saveTxt(fname,q,tosave,info=info_delay,columns=columns)
 

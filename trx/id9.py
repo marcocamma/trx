@@ -188,10 +188,10 @@ def doFolder(folder,azav_kw = dict(), datared_kw = dict(),online=True, retryMax=
       # check if there are new data
       if lastNum is None or lastNum<azav.data.shape[0]:
         tr = doFolder_dataRed(azav,**datared_kw)
-        if lines is None or len(lines) != tr.diff.shape[0]:
+        if lines is None or len(lines) != tr.diffs.shape[0]:
           lines,_ = utils.plotdiffs(tr,fig=fig,title=folder)
         else:
-          utils.updateLines(lines,tr.diff)
+          utils.updateLines(lines,tr.diffs)
         plt.draw()
         lastNum = azav.data.shape[0]
         retryNum = 0

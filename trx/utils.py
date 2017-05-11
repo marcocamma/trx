@@ -263,9 +263,9 @@ def plotdiffs(data,select=None,err=None,absSignal=None,absSignalScale=10,
     # this selection trick done in this way allows to keep the same colors when 
     # subselecting (because I do not change the size of diffs)
     if select is not None:
-        indices = range(*select.indices(t.shape[0]))
+        indices = range(*select.indices(scan.shape[0]))
     else:
-        indices = range(len(t))
+        indices = range(len(scan))
  
     if fig is None: fig = plt.figure()
  
@@ -277,7 +277,7 @@ def plotdiffs(data,select=None,err=None,absSignal=None,absSignalScale=10,
         lines.append(line)
     for linenum,idiff in enumerate(indices):
         color = cmap(idiff/(len(diffs)-1))
-        label = timeToStr(t[idiff])
+        label = timeToStr(scan[idiff])
         kw = dict( color = color, label = label )
         if err is not None and showErr:
             line = plt.errorbar(q,diffs[idiff],err[idiff],**kw)[0]

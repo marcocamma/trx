@@ -30,7 +30,7 @@ def applyFilters(data,funcForAveraging=np.nanmean):
   if not "unfiltered" in data: data.unfiltered = \
       dict( diffs_in_scan = data.diffs_in_scan,
             chi2_0=data.chi2_0,
-            diff=data.diff )
+            diff=data.diffs )
   data.diffs_in_scan = data.unfiltered.diffs_in_scan
   filters = data.filters.keys()
   for filt_name in filters:
@@ -39,12 +39,12 @@ def applyFilters(data,funcForAveraging=np.nanmean):
     if filt[0].ndim == 1:
       for nscan in range(len(data.diffs_in_scan)):
         data.diffs_in_scan[nscan] = data.diffs_in_scan[nscan][~filt[nscan]]
-        data.diff[nscan] = funcForAveraging( data.diffs_in_scan[nscan],axis=0)
+        data.diffs[nscan] = funcForAveraging( data.diffs_in_scan[nscan],axis=0)
     elif filt[0].ndim == 2: # q-by-q kind of filter
       for nscan in range(len(data.diffs_in_scan)):
         data.diffs_in_scan[nscan][~filt[nscan]] = np.nan
-        data.diff[nscan] = funcForAveraging( data.diffs_in_scan[nscan],axis=0)
-  data.diffs_plus_ref = data.diff+data.ref_average
+        data.diffs[nscan] = funcForAveraging( data.diffs_in_scan[nscan],axis=0)
+  data.diffs_plus_ref = data.diffs+data.ref_average
   return data
 
 
@@ -111,7 +111,7 @@ def chi2Filter(data,threshold='auto'):
     #idx = utils.reshapeToBroadcast(idx,data.diffsInScanPoint[iscan])
     idx_mask.append(idx)
     log.info("Chi2 mask, scanpoint: %s, curves filtereout out %d/%d (%.2f%%)"%\
-              (data.diff[iscan],idx.sum(),len(idx),idx.sum()/len(idx)*100) )
+              (data.diffs[iscan],idx.sum(),len(idx),idx.sum()/len(idx)*100) )
 
   if "filters" not in data: data.filters = dict()
   if "filters_pars" not in data: data.filters_pars = dict()
