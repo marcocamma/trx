@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """ 
     Module to handle masks: it defines:
 
@@ -8,7 +9,7 @@
       - interpretMask: interpret mask element (filename,y>500,array)
       - interpretMasks: add up list of mask elements
 """
-from __future__ import print_function
+from __future__ import print_function,division,absolute_import,unicode_literals
 import sys
 if sys.version_info.major == 2: input=raw_input
 import logging
@@ -20,8 +21,15 @@ import collections
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.path import Path
+import fabio
 
-from . import azav
+def read(fname):
+  """ read data from file using fabio """
+  f = fabio.open(fname)
+  data = f.data
+  del f; # close file
+  return data
+
 
 maskComponent = collections.namedtuple('maskComponent',['operation','geometry','vertices'])
 
@@ -60,7 +68,7 @@ class Mask(object):
   """
   def __init__(self,img=None):
     self.comp = []
-    if isinstance(img,str): img = azav.read(img)
+    if isinstance(img,str): img = read(img)
     # if img is not array at this point assume it is a shape-tuple
     if not isinstance(img,np.ndarray): img = np.zeros( img, dtype=bool )
     self.img  = img
@@ -170,7 +178,7 @@ def makeMaskGui(img,snapRange=60,clim='auto'):
           instance of the Mask class that allows to modify or save the mask
 
   """
-  if isinstance(img,str): img = azav.read(img)
+  if isinstance(img,str): img = read(img)
   mask = Mask(img)
   if clim == "auto": clim = np.percentile(img,(2,98))
   ans='ok'
@@ -288,7 +296,7 @@ def interpretMask(mask,shape=None):
   maskout = None
   ## simplest case, an existing file
   if isinstance(mask,str) and os.path.isfile(mask):
-    maskout = azav.read(mask).astype(np.bool)
+    maskout = read(mask).astype(np.bool)
   ## mask string
   elif isinstance(mask,str) and not os.path.isfile(mask):
     if isinstance(shape,np.ndarray) : shape = shape.shape

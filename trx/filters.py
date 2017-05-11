@@ -1,9 +1,10 @@
+# -*- coding: utf-8 -*-
 """ 
   module that contains filters and outliers removal procedures 
   most of them return the data array and a dictionary with additional info
   (parameters, statistics, etc)
 """
-from __future__ import print_function,division
+from __future__ import print_function,division,absolute_import,unicode_literals
 from . import utils
 import copy
 import logging
@@ -43,7 +44,7 @@ def applyFilters(data,funcForAveraging=np.nanmean):
       for nscan in range(len(data.diffs_in_scan)):
         data.diffs_in_scan[nscan][~filt[nscan]] = np.nan
         data.diff[nscan] = funcForAveraging( data.diffs_in_scan[nscan],axis=0)
-  data.diff_plus_ref = data.diff+data.ref_average
+  data.diffs_plus_ref = data.diff+data.ref_average
   return data
 
 

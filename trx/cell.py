@@ -1,4 +1,5 @@
-from __future__ import division,print_function
+# -*- coding: utf-8 -*-
+from __future__ import print_function,division,absolute_import,unicode_literals
 import collections
 import itertools
 import numpy as np
@@ -51,7 +52,7 @@ class Triclinic(object):
     idx = q<maxQ;
     q = q[idx]
     hkl = hkl[idx]
-
+    q = np.round(q,12)
     qunique = np.unique(q)
     ret = []
     for qi in qunique:
@@ -66,6 +67,11 @@ class Triclinic(object):
 class Orthorombic(Triclinic):
   def __init__(self,a=1,b=1,c=1):
     Triclinic.__init__(self,a=a,b=b,c=c,alpha=90,beta=90,gamma=90)
+
+class Cubic(Orthorombic):
+  def __init__(self,a=1):
+    Orthorombic.__init__(self,a=a,b=a,c=a)
+
 
 class Monoclinic(object):
   def __init__(self,a=1,b=1,c=1,beta=90.):
@@ -96,3 +102,5 @@ ti3o5_beta   = Triclinic(a = 9.7382 , b = 3.8005 , c = 9.4333 , beta = 91.496)
 #ti3o5_beta   = Monoclinic(a = 9.7382 , b = 3.8005 , c = 9.4333 , beta = 91.496)
 ti3o5_alpha  = Triclinic(a = 9.8372,  b = 3.7921,  c = 9.9717)
 ti3o5_alpha1  = Orthorombic(a = 9.8372,  b = 3.7921,  c = 9.9717)
+
+si = Cubic(a=5.431020504)

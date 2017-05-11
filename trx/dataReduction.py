@@ -1,4 +1,5 @@
-from __future__ import print_function,division
+# -*- coding: utf-8 -*-
+from __future__ import print_function,division,absolute_import,unicode_literals
 
 import logging
 log = logging.getLogger(__name__)
@@ -170,7 +171,7 @@ def averageScanPoints(scan,data,errAbs=None,isRef=None,lpower=None,
     diff_err[i] = noise/np.sqrt(shot_idx.sum())
   ret = dict(scan=scan_pos,diff=diff,err=diff_err,
         chi2_0=chi2_0,diffs_in_scan=diffs_in_scan,
-        ref_average = ref_average, diff_plus_ref=diff+ref_average,
+        ref_average = ref_average, diffs_plus_ref=diff+ref_average,
         average=average,median=median,args=args)
   ret = DataStorage(ret)
   if chi2_0_max is not None:
@@ -223,7 +224,7 @@ def saveTxt(folder,data,delayToStr=True,basename='auto',info="",**kw):
   fname = os.path.join(folder,"%sdiff_av_matrix.txt" %basename)
   utils.saveTxt(fname,q,data.diff,headerv=data.scan,**kw)
   fname = os.path.join(folder,"%sdiff_plus_ref_av_matrix.txt" %basename)
-  utils.saveTxt(fname,q,data.diff_plus_ref,headerv=data.scan,**kw)
+  utils.saveTxt(fname,q,data.diffs_plus_ref,headerv=data.scan,**kw)
   # save error bars in the matrix form
   fname = os.path.join(folder,"%sdiff_av_matrix_err.txt" % basename)
   utils.saveTxt(fname,q,data.err,headerv=data.scan,**kw)

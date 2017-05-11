@@ -5,7 +5,7 @@ def readme():
         return f.read()
 
 setup(name='trx',
-      version='0.3.0',
+      version='0.4.0',
       description='Tools for time resolved x-ray techniques',
       long_description=readme(),
       url='https://github.com/marcocamma/trx',
@@ -19,5 +19,6 @@ setup(name='trx',
           'pyFAI',
           'matplotlib',
           'datastorage',
+          'statsmodels'
       ],
       zip_safe=False)
