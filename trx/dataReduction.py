@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import print_function,division,absolute_import,unicode_literals
+from __future__ import print_function,division,absolute_import
 
 import logging
 log = logging.getLogger(__name__)
@@ -222,7 +222,7 @@ def saveTxt(folder,data,delayToStr=True,basename='auto',info="",**kw):
   q = data.q if "q" in data else np.arange(data.diffs.shape[-1])
   # save one file with all average diffs
   fname = os.path.join(folder,"%sdiff_av_matrix.txt" %basename)
-  utils.saveTxt(fname,q,data.diff,headerv=data.scan,**kw)
+  utils.saveTxt(fname,q,data.diffs,headerv=data.scan,**kw)
   fname = os.path.join(folder,"%sdiff_plus_ref_av_matrix.txt" %basename)
   utils.saveTxt(fname,q,data.diffs_plus_ref,headerv=data.scan,**kw)
   # save error bars in the matrix form

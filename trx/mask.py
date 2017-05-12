@@ -9,7 +9,7 @@
       - interpretMask: interpret mask element (filename,y>500,array)
       - interpretMasks: add up list of mask elements
 """
-from __future__ import print_function,division,absolute_import,unicode_literals
+from __future__ import print_function,division,absolute_import
 import sys
 if sys.version_info.major == 2: input=raw_input
 import logging
@@ -68,6 +68,10 @@ class Mask(object):
   """
   def __init__(self,img=None):
     self.comp = []
+    if img is not None:
+      self.shape = img.shape
+    else:
+      self.shape = None
     if isinstance(img,str): img = read(img)
     # if img is not array at this point assume it is a shape-tuple
     if not isinstance(img,np.ndarray): img = np.zeros( img, dtype=bool )
@@ -141,10 +145,14 @@ class Mask(object):
 
   def save(self,fname,inverted=False):
     import fabio
+    if self.mask is None: self.getMask()
     mask = self.mask
     if (inverted): mask = ~mask
-    i=fabio.edfimage.edfimage(mask.astype(np.uint8)); # edf does not support bool
-    i.save(fname)
+    if os.path.splitext(fname)[1] == ".npy":
+      np.save(fname,mask)
+    else:
+      i=fabio.edfimage.edfimage(mask.astype(np.uint8)); # edf does not support bool
+      i.save(fname)
 
 def snap(point,shape,snapRange=20):
   """ snap 'point' if within 'snapRange' from the border defined by 'shape' """

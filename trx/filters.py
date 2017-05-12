@@ -4,7 +4,7 @@
   most of them return the data array and a dictionary with additional info
   (parameters, statistics, etc)
 """
-from __future__ import print_function,division,absolute_import,unicode_literals
+from __future__ import print_function,division,absolute_import
 from . import utils
 import copy
 import logging

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import print_function,division,absolute_import,unicode_literals
+from __future__ import print_function,division,absolute_import
 from . import azav
 from . import utils
 from . import mask
@@ -13,4 +13,4 @@ try:
 except ImportError as err:
   print("Can't import submodule peaks, reason was:",e)
 
-__version__ = "0.4.1"
+__version__ = "0.5.0"

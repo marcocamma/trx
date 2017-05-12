@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import print_function,division,absolute_import,unicode_literals
+from __future__ import print_function,division,absolute_import
 import logging
 log = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ def _read(fname):
 
 def read(fnames):
   """ read data from file(s) using fabio """
-  if isinstance(fnames,str):
+  if os.path.isfile(fnames):
     data = _read(fnames)
   else:
     # read one image to know img size
@@ -246,8 +246,9 @@ def doFolder(folder="./",files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
     ai = getAI(poni,folder)
     # consistency check (saved images done with same parameters ?)
     if ai is not None:
-      if (saved.pyfai_info != ai_as_str(ai) or 
-          np.any( saved.mask != interpretMasks(mask,saved.mask.shape)) ) : 
+      if (saved.pyfai_info != ai_as_str(ai)) or  \
+          np.any( saved.mask != interpretMasks(mask,saved.mask.shape))  or \
+          (saved.args.dezinger != dezinger) : 
         log.warn("Found inconsistency between curves already saved and new ones")
         log.warn("Redoing saved ones with new parameters")
         args['force'] = True

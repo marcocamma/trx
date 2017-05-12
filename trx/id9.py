@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import print_function,division,absolute_import,unicode_literals
+from __future__ import print_function,division,absolute_import
 
 import logging
 log = logging.getLogger(__name__)
@@ -181,6 +181,7 @@ def doFolder(folder,azav_kw = dict(), datared_kw = dict(),online=True, retryMax=
   keepGoing = True
   lines   = None
   retryNum = 0
+  azav_kw['force']=force
   if online: print("Press Ctrl+C to stop")
   while keepGoing and retryNum < retryMax:
     try:
@@ -197,8 +198,8 @@ def doFolder(folder,azav_kw = dict(), datared_kw = dict(),online=True, retryMax=
         retryNum = 0
       else:
         retryNum += 1
-      plt.pause(30)
-      if force: force=False; # does not make sense to have always True ...
+      if online: plt.pause(30)
+      if force: azav_kw['force']=False; # does not make sense to have always True ...
     except KeyboardInterrupt:
       keepGoing = False
     if not online: keepGoing = False

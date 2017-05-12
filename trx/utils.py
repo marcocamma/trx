@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import print_function,division,absolute_import,unicode_literals
+from __future__ import print_function,division,absolute_import
 
 import logging
 log = logging.getLogger(__name__)  # __name__ is "foo.bar" here
@@ -153,7 +153,7 @@ def plotdata(data,x=None,plotAverage=True,showTrend=True,title=None,\
     if isinstance(data,np.ndarray):
       q = np.arange( data.shape[-1] )
     else:
-      if title is None and folder in data: title = data["folder"]
+      if title is None and 'folder' in data: title = data["folder"]
       q = data["q"]
       data = data["data"]
     if not (plotAverage or showTrend): return
@@ -182,9 +182,9 @@ def plotdata(data,x=None,plotAverage=True,showTrend=True,title=None,\
       plt.ylabel("image number, 0 being older")
       plt.xlabel(r"q ($\AA^{-1}$)")
       plt.clim( *clim )
-    if plot:
+    if plotAverage:
         ax[0].plot(q,np.nanmean(data,axis=0))
-    if (plot or showTrend) and title is not None:
+    if (plotAverage or showTrend) and title is not None:
       plt.title(title)
 
 def volumeFraction(concentration=1,molWeight=17,density=1.347):
