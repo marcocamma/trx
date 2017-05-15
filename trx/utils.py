@@ -442,6 +442,26 @@ def chargeToPhoton(chargeOrCurrent,material="Si",thickness=100e-6,energy=10,e_ho
   if len(nphoton) == 1: nphoton = float(nphoton)
   return nphoton
 
+def approx(values,approx_values):
+    """ returns array where every value is replaced by the closest in approx_values
+
+        This funciton is useful for rebinning
+
+        Example:
+        -------
+        approx( np.arange(0,1,0.1), [0,0.3,0.7] )
+           array([ 0. ,  0. ,  0.3,  0.3,  0.3,  0.7,  0.7,  0.7,  0.7,  0.7])
+
+    """
+    # make sure they are arrays
+    values = np.asarray(values)
+    approx_values = np.asarray(approx_values)
+    # create outter difference
+    diff = np.abs(values[:,np.newaxis] - approx_values)
+    args = np.argmin(diff,axis=1)
+    values = approx_values[args]
+    #values = np.asarray( [ approx_values[np.argmin(np.abs(v-approx_values))] for v in values] )
+    return values
   
 def logToScreen():
   """ It allows printing to terminal on top of logfile """
