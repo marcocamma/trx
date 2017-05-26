@@ -19,6 +19,8 @@ import re
 import fabio
 import pyFAI
 
+
+g_default_extension='.h5'
 try:
   import matplotlib.pyplot as plt
 except ImportError:
@@ -233,7 +235,7 @@ def doFolder(folder="./",files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
     args['poni'] = ai_as_dict(args['poni'])
 
   if storageFile == 'auto':
-    fname = "pyfai_1d" + default_extension
+    fname = "pyfai_1d" + g_default_extension
     if not os.path.isdir(folder): 
       # do not overide folder, it might be useful
       storageFile = os.path.join( ".",fname)
