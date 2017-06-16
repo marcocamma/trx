@@ -46,20 +46,20 @@ def A(compound='Si',thickness=100e-6, att_len=None,density=None,
     return 1-T
 
 
-def _phosphorAbsorption(twotheta,mu=1770,thickness=40e-6,energy=None):
+def _phosphorAbsorption(twotheta,mu=17700,thickness=40e-6,energy=None):
   """ return 1-np.exp(-mu*thick/np.cos(np.deg2rad(theta)))
       - mu is the neperian absorption linear coefficient (m-1)
       - twotheta is the scattering angle (in degrees)
   """
   if mu =='auto':
     assert energy is not None, "phosphorAbsorption with automatic mu requires energy"
-    att_len = attenuation_length("Ce",energy=energy,density=0.475)
+    att_len = attenuation_length("Ce",energy=energy,density=4.75)
   else:
     att_len = 1/mu
   effective_thickness = thickness/np.cos(np.deg2rad(twotheta))
   return A(att_len=att_len,thickness=effective_thickness)
 
-def phosphorCorrection(twotheta,mu=1770,thickness=40e-6,energy=None,normalizeToZeroAngle=False):
+def phosphorCorrection(twotheta,mu=17700,thickness=40e-6,energy=None,normalizeToZeroAngle=False):
   """ helper function to correct for angle dependent absorption of the phosphor screen for an
       x-ray detector.
       return the correction factor one has to *multiply* the data for.
