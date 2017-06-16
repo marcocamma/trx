@@ -21,28 +21,34 @@ def attenuation_length(compound=None, density=None, natural_density=None,energy=
 
 
 def transmission(compound='Si',thickness=100e-6, att_len=None,density=None, 
-    natural_density=None,energy=None, wavelength=None):
+    natural_density=None,energy=None, wavelength=None,angle=None):
     """ calculate transmission of a given thickness of compound.
         if att_len (in m-1) is not given, it is calculated based on compound 
         information and energy or wavelength)
+        if angle is given, the thickness is divided by cos(angle)
+        angle has to be in deg. angle=0 means perpendicular
     """
     if att_len is None:
         att_len = attenuation_length(compound=compound,density=density,
                   natural_density=natural_density,energy=energy,
                   wavelength=wavelength)
     # takes care if both are arrays ...
+    if angle is not None:
+      thickness /= np.cos(np.deg2rad(angle))
     argument = np.squeeze(np.outer(thickness,1/att_len))
     return np.exp(-argument)
 
 def A(compound='Si',thickness=100e-6, att_len=None,density=None, 
-    natural_density=None,energy=None, wavelength=None):
+    natural_density=None,energy=None, wavelength=None,angle=None):
     """ calculate absorption of a given thickness of compound.
         if att_len (in m-1) is not given, it is calculated based on compound 
         information and energy or wavelength)
+        if angle is given, the thickness is divided by cos(angle)
+        angle has to be in deg. angle=0 means perpendicular
     """
     T = transmission(compound=compound,density=density,att_len=att_len,
                   natural_density=natural_density,energy=energy,
-                  thickness=thickness, wavelength=wavelength)
+                  thickness=thickness, wavelength=wavelength,angle=angle)
     return 1-T
 
 
@@ -56,8 +62,7 @@ def _phosphorAbsorption(twotheta,mu=17700,thickness=40e-6,energy=None):
     att_len = attenuation_length("Ce",energy=energy,density=4.75)
   else:
     att_len = 1/mu
-  effective_thickness = thickness/np.cos(np.deg2rad(twotheta))
-  return A(att_len=att_len,thickness=effective_thickness)
+  return A(att_len=att_len,thickness=thickness,angle=twotheta)
 
 def phosphorCorrection(twotheta,mu=17700,thickness=40e-6,energy=None,normalizeToZeroAngle=False):
   """ helper function to correct for angle dependent absorption of the phosphor screen for an
