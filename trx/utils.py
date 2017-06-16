@@ -416,6 +416,30 @@ def transmission(material='Si',thickness=100e-6, density=None, natural_density=N
   return np.exp(-thickness/att_len)
 
 
+def _phosphorAbsorption(twotheta,mu=1770,thickness=40e-6,E=None):
+  """ return 1-np.exp(-mu*thick/np.cos(np.deg2rad(theta)))
+      - mu is the neperian absortption linear coefficient (m-1)
+      - twotheta is the scattering angle (in degrees)
+  """
+  if mu =='auto':
+    assert E is not None, "phosphorAbsorption with automatic mu requires E"
+    mu = 1/attenuation_length("Ce",energy=E,density=0.475)
+  return 1-np.exp(-mu*thickness/np.cos(np.deg2rad(twotheta)))
+
+def phosphorCorrection(twotheta,mu=1770,thickness=40e-6,E=None,normalizeToZeroAngle=False):
+  """ helper function to correct for angle dependent absorption of the phosphor screen for an
+      x-ray detector.
+      return the correction factor one has to *multiply* the data for.
+      - mu is the neperian absortption linear coefficient (m-1) [could be 'auto' if E is given]
+      - twotheta is the scattering angle (in degrees)
+  """
+  corr = 1/_phosphorAbsorption(twotheta,mu=mu,thickness=thickness,E=E)
+  if normalizeToZeroAngle: corr = corr*_phosphorAbsorption(0,mu=mu,thickness=thickness,E=E)
+  return corr
+
+
+
+
 def chargeToPhoton(chargeOrCurrent,material="Si",thickness=100e-6,energy=10,e_hole_pair=3.63):
   """
     Function to convert charge (or current to number of photons (or number 
@@ -475,3 +499,5 @@ def logToScreen():
   # add the handler to the root logger (if needed)
   if len(logging.getLogger('').handlers)==1:
     logging.getLogger('').addHandler(console)
+
+
