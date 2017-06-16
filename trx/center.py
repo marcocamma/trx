@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import fabio
+from .mask import interpretMasks
+
 from datastorage import DataStorage
 
 def _calc_R(x,y, xc, yc):
@@ -49,6 +51,8 @@ def find_center_using_circle(img,X=None,Y=None,mask=None,percentile=(90,99),\
         pass
     # make sure that is float (and create a local copy) 
     img = img.astype(float)
+    if mask is not None and not isinstance(mask,np.ndarray):
+        mask = interpretMasks(mask,img.shape)
     if mask is not None:
         img[mask] = np.nan
     zmin,zmax = np.nanpercentile(img.ravel(),percentile[:2])

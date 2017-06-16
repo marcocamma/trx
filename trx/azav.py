@@ -88,6 +88,8 @@ def do1d(ai, imgs, mask = None, npt_radial = 600, method = 'csr',safe=True,dark=
     # force float to be sure of type casting for img
     if isinstance(dark,int): dark = float(dark);
     if imgs.ndim == 2: imgs = (imgs,)
+    if mask is not None and not isinstance(mask,np.ndarray):
+        mask = interpretMasks(mask,imgs[0].shape)
     out_i = np.empty( ( len(imgs), npt_radial) )
     out_s = np.empty( ( len(imgs), npt_radial) )
     for _i,img in enumerate(imgs):
@@ -108,6 +110,8 @@ def do2d(ai, imgs, mask = None, npt_radial = 600, npt_azim=360,method = 'csr',sa
     # force float to be sure of type casting for img
     if isinstance(dark,int): dark = float(dark);
     if imgs.ndim == 2: imgs = (imgs,)
+    if mask is not None and not isinstance(mask,np.ndarray):
+        mask = interpretMasks(mask,imgs[0].shape)
     out = np.empty( ( len(imgs), npt_azim,npt_radial) )
     for _i,img in enumerate(imgs):
       i2d,q,azTheta = ai.integrate2d(img-dark, npt_radial, npt_azim=npt_azim,
