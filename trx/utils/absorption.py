@@ -63,7 +63,8 @@ def phosphorCorrection(twotheta,mu=17700,thickness=40e-6,energy=None,normalizeTo
   """ helper function to correct for angle dependent absorption of the phosphor screen for an
       x-ray detector.
       return the correction factor one has to *multiply* the data for.
-      - mu is the neperian absorption linear coefficient (m-1) [could be 'auto' if energy is given]
+      - mu is the neperian absorption linear coefficient (m-1) 
+          [could be 'auto' if energy is given]
       - twotheta is the scattering angle (in degrees)
   """
   corr = 1/_phosphorAbsorption(twotheta,mu=mu,thickness=thickness,energy=energy)
@@ -71,6 +72,31 @@ def phosphorCorrection(twotheta,mu=17700,thickness=40e-6,energy=None,normalizeTo
     corr = corr*_phosphorAbsorption(0,mu=mu,thickness=thickness,energy=energy)
   return corr
 
+def liquidSheetAbsorptionCorrection(twotheta=0,compound="H2O",thickness=300e-6,
+    density=1,att_len=None,energy=None,wavelength=None,
+    normalizeToZeroAngle=False):
+    """ helper function for angular dependence of sample absorption
+
+        returns the correction factor one has to *multiply* the intensity for
+        the uncorrected I(theta) is divided by the T(theta)/T(0)
+        where the transmittion T(theta) is:
+        1/(mu*l) cos(theta)/(1-cos(theta))*(exp(-mu*l)-exp(-mu*l/cos(theta)))
+        twotheta is in deg
+    """
+    if att_len is None : 
+        att_len = attenuation_length(compound=compound,density=density,
+                  energy=energy,wavelength=wavelength)
+    if np.isscalar(twotheta): twotheta = np.asarray( (twotheta,) )
+    twotheta = np.deg2rad(twotheta)
+    idx = (twotheta < 0.001)
+    twotheta[idx] = 0.001
+    cos      = np.cos(twotheta)
+    t1 = transmission(att_len=att_len,thickness=thickness)
+    t2 = transmission(att_len=att_len,thickness=thickness/cos)
+    arg = thickness/att_len
+    temp = 1/arg*cos/(1-cos)*(t1-t2)
+    if normalizeToZeroAngle: temp /= transmission(att_len=att_len,thickness=thickness)
+    return 1/temp
 
 
 def chargeToPhoton(chargeOrCurrent,compound="Si",thickness=100e-6,energy=10,e_hole_pair=3.63):
