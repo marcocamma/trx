@@ -4,8 +4,18 @@ from __future__ import print_function,division,absolute_import
 import logging
 log = logging.getLogger(__name__)  # __name__ is "foo.bar" here
 
+import os
 import numpy as np
 np.seterr(all='ignore')
+
+try:
+  import progressbar as pb
+  _has_progress_bar = True
+except ImportError:
+  _has_progress_bar = False
+  log.warn("Reccomended package: progressbar is missing")
+
+
 
 def progressBar(N,title="Percentage"):
   if _has_progress_bar:
