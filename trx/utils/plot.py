@@ -6,6 +6,7 @@ log = logging.getLogger(__name__)  # __name__ is "foo.bar" here
 
 import numpy as np
 np.seterr(all='ignore')
+from .string import timeToStr
 
 try:
   import matplotlib.pyplot as plt
