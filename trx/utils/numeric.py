@@ -15,7 +15,7 @@ def findSlice(array,lims):
 def approx(values,approx_values):
     """ returns array where every value is replaced by the closest in approx_values
 
-        This funciton is useful for rebinning
+        This funciton is useful for rebinning; careful, can be slow with many bins...
 
         Example:
         -------
@@ -33,6 +33,23 @@ def approx(values,approx_values):
     #values = np.asarray( [ approx_values[np.argmin(np.abs(v-approx_values))] for v in values] )
     return values
 
+
+def rebin(values,bins):
+    """ returns array where every value is replaced by the closest in approx_values
+
+        This funciton is useful for rebinning
+
+        Example:
+        -------
+        approx( np.arange(0,1,0.1), [0,0.3,0.7] )
+           array([ 0. ,  0. ,  0.3,  0.3,  0.3,  0.7,  0.7,  0.7,  0.7,  0.7])
+
+    """
+    # make sure they are arrays
+    bins = np.asarray(bins)
+    idx = np.digitize(values,bins)
+    idx[idx > bins.shape[0]-1] = bins.shape[0]-1
+    return (bins[idx]+bins[idx-1])/2
 
 def reshapeToBroadcast(what,ref):
   """ expand the 1d array 'what' to allow broadbasting to match 
