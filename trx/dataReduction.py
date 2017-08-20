@@ -110,6 +110,7 @@ def averageScanPoints(scan,data,errAbs=None,isRef=None,lpower=None,
   median  = np.median(data,axis=0)
 
   if isRef is None: isRef = np.zeros( data.shape[0], dtype=bool )
+  isRef = np.asarray(isRef).astype(bool)
   assert data.shape[0] == isRef.shape[0], \
     "Size mismatch, data is %d, isRef %d"%(data.shape[0],isRef.shape[0])
 
@@ -138,7 +139,7 @@ def averageScanPoints(scan,data,errAbs=None,isRef=None,lpower=None,
   diffs_in_scan = []
   chi2_0 = []
   for i,t in enumerate(scan_pos):
-    shot_idx = (scan == t)
+    shot_idx = (scan == t) & ~isRef
     if shot_idx.sum() == 0:
       log.warn("No data to average for scan point %s"%str(t))
 
