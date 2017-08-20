@@ -188,10 +188,16 @@ def calcTimeResolvedSignal(scan,data,err=None,reference="min",q=None,
     q        : is needed if monitor is a tuple|list
     saveTxt  : will save txt outputfiles (diff_av_*) in folder
     other keywords are passed to averageScanPoints
+
+    **kw are passed to averageScanPoints. Notable parameters are
+      isRef : None or array(N); if None no reference is subtracted
+      lpower : None or array(N)
+      useRatio : bool
+      chi2_0_max = None, "auto" or float
   """
-  if reference == "min":
+  if isinstance(reference,str) and reference == "min":
     isRef = (scan == scan.min())
-  elif reference == "max":
+  elif isinstance(reference,str) and reference == "max":
     isRef = (scan == scan.max())
   elif isinstance(reference,(float,int)):
     isRef = (scan == reference)
