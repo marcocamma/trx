@@ -111,7 +111,7 @@ def chi2Filter(data,threshold='auto'):
     #idx = utils.reshapeToBroadcast(idx,data.diffsInScanPoint[iscan])
     idx_mask.append(idx)
     log.info("Chi2 mask, scanpoint: %s, curves filtereout out %d/%d (%.2f%%)"%\
-              (data.diffs[iscan],idx.sum(),len(idx),idx.sum()/len(idx)*100) )
+              (data.scan[iscan],idx.sum(),len(idx),idx.sum()/len(idx)*100) )
 
   if "filters" not in data: data.filters = dict()
   if "filters_pars" not in data: data.filters_pars = dict()
