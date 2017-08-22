@@ -5,7 +5,7 @@ def readme():
         return f.read()
 
 setup(name='trx',
-      version='0.5.4',
+      version='0.5.5',
       description='tools for (T)ime (R)esolved (X)-ray techniques',
       long_description=readme(),
       url='https://github.com/marcocamma/trx',
