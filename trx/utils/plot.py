@@ -134,7 +134,7 @@ def plotdiffs(data,select=None,err=None,absSignal=None,absSignalScale=10,
     if absSignal is not None:
         line = plt.plot(q,absSignal/absSignalScale,lw=3,
                       color='k',label="absSignal/%s"%str(absSignalScale))[0]
-        lines.append(line)
+        lines_abs.append(line)
     for linenum,idiff in enumerate(indices):
         color = cmap(idiff/(len(diffs)-1))
         label = timeToStr(scan[idiff])

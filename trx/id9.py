@@ -77,6 +77,7 @@ def readLogFile(fnameOrFolder,subtractDark=False,skip_first=0,
     fname = findLogFile(fnameOrFolder)
   else:
     fname = fnameOrFolder
+  log.info("Reading id9 logfile:",fname)
   f = open(fname,"r")
   lines = f.readlines()
   f.close()
@@ -91,6 +92,9 @@ def readLogFile(fnameOrFolder,subtractDark=False,skip_first=0,
     if line.lstrip()[0] != "#": break
   data=np.genfromtxt(fname,skip_header=iline-1,names=True,comments="%",dtype=None,converters = {'delay': lambda s: _delayToNum(s)})
   idx_cur = data['currentmA'] > srcur_min
+  if (idx_cur.sum() < idx_cur.shape[0]*0.5):
+    log.warn("Minimum srcur filter has kept only %.1f%%"%(idx_cur.sum()/idx_cur.shape[0]*100))
+    log.warn("Minimum srcur: %.2f, median(srcur): %.2f"%(srcur_min,np.nanmedian(data["currentmA"]))) 
   data = data[idx_cur]
   if subtractDark:
     for diode in ['pd1ic','pd2ic','pd3ic','pd4ic']:
