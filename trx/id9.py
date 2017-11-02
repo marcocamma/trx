@@ -91,11 +91,14 @@ def readLogFile(fnameOrFolder,subtractDark=False,skip_first=0,
   for iline,line in enumerate(lines):
     if line.lstrip()[0] != "#": break
   data=np.genfromtxt(fname,skip_header=iline-1,names=True,comments="%",dtype=None,converters = {'delay': lambda s: _delayToNum(s)})
-  idx_cur = data['currentmA'] > srcur_min
-  if (idx_cur.sum() < idx_cur.shape[0]*0.5):
-    log.warn("Minimum srcur filter has kept only %.1f%%"%(idx_cur.sum()/idx_cur.shape[0]*100))
-    log.warn("Minimum srcur: %.2f, median(srcur): %.2f"%(srcur_min,np.nanmedian(data["currentmA"]))) 
-  data = data[idx_cur]
+  try:
+    idx_cur = data['currentmA'] > srcur_min
+    if (idx_cur.sum() < idx_cur.shape[0]*0.5):
+      log.warn("Minimum srcur filter has kept only %.1f%%"%(idx_cur.sum()/idx_cur.shape[0]*100))
+      log.warn("Minimum srcur: %.2f, median(srcur): %.2f"%(srcur_min,np.nanmedian(data["currentmA"]))) 
+    data = data[idx_cur]
+  except ValueError:
+    log.warn("Could not find currentmA field")
   if subtractDark:
     for diode in ['pd1ic','pd2ic','pd3ic','pd4ic']:
       if diode in darks: data[diode]=data[diode]-darks[diode]*data['timeic']
@@ -103,7 +106,7 @@ def readLogFile(fnameOrFolder,subtractDark=False,skip_first=0,
   if asDataStorage:
     # rstrip("_") is used to clean up last _ that appera for some reason in file_
     data = DataStorage( dict((name.rstrip("_"),data[name]) for name in data.dtype.names ) )
-  data.file = data.file.astype(str)
+  if 'file' in data: data.file = data.file.astype(str)
   return data
 
 
