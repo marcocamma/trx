@@ -35,7 +35,7 @@ def _read(fname):
 
 def read(fnames):
   """ read data from file(s) using fabio """
-  if os.path.isfile(fnames):
+  if isinstance(fnames,str) and os.path.isfile(fnames):
     data = _read(fnames)
   else:
     # read one image to know img size
