@@ -72,42 +72,50 @@ def findLogFile(folder):
 
 def readLogFile(fnameOrFolder,subtractDark=False,skip_first=0,
     asDataStorage=True,last=None,srcur_min=30):
-  """ read id9 style logfile """
-  if os.path.isdir(fnameOrFolder):
-    fname = findLogFile(fnameOrFolder)
-  else:
-    fname = fnameOrFolder
-  log.info("Reading id9 logfile:",fname)
-  f = open(fname,"r")
-  lines = f.readlines()
-  f.close()
-  lines = [line.strip() for line in lines]
-  darks = {}
-  for line in lines:
-    if line.find("pd1 dark/sec")>=0: darks['pd1ic'] = _findDark(line)
-    if line.find("pd2 dark/sec")>=0: darks['pd2ic'] = _findDark(line)
-    if line.find("pd3 dark/sec")>=0: darks['pd3ic'] = _findDark(line)
-    if line.find("pd4 dark/sec")>=0: darks['pd4ic'] = _findDark(line)
-  for iline,line in enumerate(lines):
-    if line.lstrip()[0] != "#": break
-  data=np.genfromtxt(fname,skip_header=iline-1,names=True,comments="%",dtype=None,converters = {'delay': lambda s: _delayToNum(s)})
-  try:
-    idx_cur = data['currentmA'] > srcur_min
-    if (idx_cur.sum() < idx_cur.shape[0]*0.5):
-      log.warn("Minimum srcur filter has kept only %.1f%%"%(idx_cur.sum()/idx_cur.shape[0]*100))
-      log.warn("Minimum srcur: %.2f, median(srcur): %.2f"%(srcur_min,np.nanmedian(data["currentmA"]))) 
-    data = data[idx_cur]
-  except ValueError:
-    log.warn("Could not find currentmA field")
-  if subtractDark:
-    for diode in ['pd1ic','pd2ic','pd3ic','pd4ic']:
-      if diode in darks: data[diode]=data[diode]-darks[diode]*data['timeic']
-  data = data[skip_first:last]
-  if asDataStorage:
-    # rstrip("_") is used to clean up last _ that appera for some reason in file_
-    data = DataStorage( dict((name.rstrip("_"),data[name]) for name in data.dtype.names ) )
-  if 'file' in data: data.file = data.file.astype(str)
-  return data
+    """ read id9 style logfile; 
+        last before data will be used as keys ... 
+        only srcur>srcur_min will be kept
+        subtractDark is not needed for data collected with waxscollect
+    """
+    if os.path.isdir(fnameOrFolder):
+      fname = findLogFile(fnameOrFolder)
+    else:
+      fname = fnameOrFolder
+    log.info("Reading id9 logfile:",fname)
+
+    data = utils.files.readLogFile(fname,skip_first=skip_first,last=last,\
+           output = "array")
+ 
+    # work on darks if needed
+    if subtractDark:
+        ## find darks
+        with open(fname,"r") as f: lines = f.readlines()
+        lines = [line.strip() for line in lines]
+        # look only for comment lines
+        lines = [ line for line in lines if line[0] == "#" ]
+        for line in lines:
+            if line.find("pd1 dark/sec")>=0: darks['pd1ic'] = _findDark(line)
+            if line.find("pd2 dark/sec")>=0: darks['pd2ic'] = _findDark(line)
+            if line.find("pd3 dark/sec")>=0: darks['pd3ic'] = _findDark(line)
+
+        ## subtract darks
+        for diode in ['pd1ic','pd2ic','pd3ic','pd4ic']:
+            if diode in darks: data[diode]=data[diode]-darks[diode]*data['timeic']
+
+    # srcur filter
+    if "currentmA" in data.dtype.names:
+        idx_cur = data['currentmA'] > srcur_min
+        if (idx_cur.sum() < idx_cur.shape[0]*0.5):
+            log.warn("Minimum srcur filter has kept only %.1f%%"%(idx_cur.sum()/idx_cur.shape[0]*100))
+            log.warn("Minimum srcur: %.2f, median(srcur): %.2f"%(srcur_min,np.nanmedian(data["currentmA"]))) 
+        data = data[idx_cur]
+    else:
+        log.warn("Could not find currentmA in logfile, skipping filtering")
+
+    if asDataStorage:
+      data = DataStorage( dict((name,data[name]) for name in data.dtype.names ) )
+
+    return data
 
 
 def doFolder_azav(folder,nQ=1500,files='*.edf*',force=False,mask=None,
