@@ -5,6 +5,7 @@ import logging
 log = logging.getLogger(__name__)  # __name__ is "foo.bar" here
 
 import numpy as np
+import numbers
 np.seterr(all='ignore')
 
 def findSlice(array,lims):
