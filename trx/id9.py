@@ -58,14 +58,19 @@ def _findDark(line):
 
 def _delayToNum(delay):
   if delay.decode('ascii') == 'off':
-    delay = -10
+    delay = -10.0 # .0 is necessary to force float when converting arrays
   else:
     delay=utils.strToTime(delay)
-  return delay
+  return float(delay)
 
 def findLogFile(folder):
   files = utils.getFiles(folder,basename='*.log')
-  files.remove(os.path.join(folder,"diagnostics.log"))
+
+  # remove diagnostic if present
+  diag = os.path.join(folder,"diagnostics.log")
+  if diag in files:
+    files.remove(diag)
+
   logfile = files[0]
   if len(files)>1: log.warn("Found more than one *.log file that is not diagnostics.log: %s"%files)
   return logfile
@@ -84,7 +89,7 @@ def readLogFile(fnameOrFolder,subtractDark=False,skip_first=0,
     log.info("Reading id9 logfile:",fname)
 
     data = utils.files.readLogFile(fname,skip_first=skip_first,last=last,\
-           output = "array")
+           output = "array",converters=dict(delay=_delayToNum))
  
     # work on darks if needed
     if subtractDark:
