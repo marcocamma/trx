@@ -253,15 +253,16 @@ def doFolder(folder="./",files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
     ai = getAI(poni,folder)
     # consistency check (saved images done with same parameters ?)
     if ai is not None:
-      keys_to_compare = "nQ mask dark poni logDict dezinger skip_first last"
+      keys_to_compare = "nQ mask dark poni dezinger skip_first last"
       keys_to_compare = keys_to_compare.split()
-      # recursively transform in plain dict
-      saved_args = saved.args.toDict()
+      # recursively transform in plain dict and limit comparison to given keys
+      saved_args = DataStorage(saved.args).toDict()
+      now_args   = DataStorage(args).toDict()
       saved_args = dict( [(k,saved_args[k]) for k in keys_to_compare] )
-      now_args   = dict( [(k,args[k])       for k in keys_to_compare] )
+      now_args   = dict( [(k,now_args[k])   for k in keys_to_compare] )
       if (saved.pyfai_info != ai_as_str(ai)) or  \
           np.any( saved.mask != interpretMasks(mask,saved.mask.shape))  or \
-          (saved_args != now_args) :
+          not utils.is_same(saved_args,now_args) :
         log.warn("Found inconsistency between curves already saved and new ones")
         log.warn("Redoing saved ones with new parameters")
         if (saved.pyfai_info != ai_as_str(ai)):
@@ -271,11 +272,11 @@ def doFolder(folder="./",files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
             log.warn("Masks are different")
             log.warn("Old mask",saved.mask)
             log.warn("New mask",interpretMasks(mask,saved.mask.shape))
-        if saved_args != now_args:
+        if not utils.is_same(saved_args,now_args):
             for k in now_args.keys():
-                if saved_args[k] != now_args[k]:
-                    log.warn("Parameter '%s' changed from %s to %s"%\
-                            (k,saved_args[k],now_args[k]))
+                if not utils.is_same(saved_args[k],now_args[k]):
+                        log.warn("Parameter '%s' changed from %s to %s"%\
+                                (k,saved_args[k],now_args[k]))
         args['force'] = True
         saved = doFolder(**args)
   else:

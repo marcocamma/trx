@@ -6,6 +6,7 @@ log = logging.getLogger(__name__)  # __name__ is "foo.bar" here
 
 import os
 import numpy as np
+from datastorage import DataStorage
 np.seterr(all='ignore')
 
 try:
@@ -61,6 +62,33 @@ def saveTxt(fname,q,data,headerv=None,info=None,overwrite=True,columns=''):
     s = "#" + " ".join( [str(c).center(12) for c in columns] )
     header = header + "\n" + s if header != '' else s
   np.savetxt(fname,x.T,fmt="%+10.5e",header=header,comments='')
+
+def is_same(stuff1,stuff2):
+    """ smart compare of stuff """
+    
+    # list and tuples to arrays
+    if isinstance(stuff1,(list,tuple)): stuff1 = np.asarray(stuff1)
+    if isinstance(stuff2,(list,tuple)): stuff2 = np.asarray(stuff2)
+
+    # datastorage to its dict version
+    if isinstance(stuff1,DataStorage): stuff1 = stuff1.toDict()
+    if isinstance(stuff2,DataStorage): stuff2 = stuff2.toDict()
+
+    if isinstance(stuff1,np.ndarray) or isinstance(stuff2,np.ndarray):
+        return np.array_equal(stuff1,stuff2)
+    elif isinstance(stuff1,dict) and isinstance(stuff2,dict):
+        if stuff1.keys() != stuff2.keys():
+            return False
+        else:
+            temp_same = True
+            for key in stuff1.keys():
+                if not is_same(stuff1[key],stuff2[key]):
+                    temp_same = False
+                    break
+            return temp_same
+    else:
+        # hope that python figures things out ...
+        return stuff1 == stuff2
 
 def logToScreen():
   """ It allows printing to terminal on top of logfile """

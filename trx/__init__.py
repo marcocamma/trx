@@ -14,4 +14,4 @@ try:
 except ImportError as err:
   print("Can't import submodule peaks, reason was:",e)
 
-__version__ = "0.5.14"
+__version__ = "0.5.15"
