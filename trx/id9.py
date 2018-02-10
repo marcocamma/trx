@@ -4,6 +4,7 @@ from __future__ import print_function,division,absolute_import
 import logging
 log = logging.getLogger(__name__)
 
+import time
 import os
 import collections
 import numpy as np
@@ -33,6 +34,7 @@ def _readDiagnostic(fname,retry=3):
     except Exception as e:
       log.warn("Could not read diagnostic file, retrying soon,error was %s"%e)
       ntry += 1
+      time.sleep(0.2)
   # it should not arrive here
   raise ValueError("Could not read diagnostic file after %d attempts"%retry)
 
@@ -86,7 +88,7 @@ def readLogFile(fnameOrFolder,subtractDark=False,skip_first=0,
       fname = findLogFile(fnameOrFolder)
     else:
       fname = fnameOrFolder
-    log.info("Reading id9 logfile:",fname)
+    log.info("Reading id9 logfile: %s"%fname)
 
     data = utils.files.readLogFile(fname,skip_first=skip_first,last=last,\
            output = "array",converters=dict(delay=_delayToNum))
@@ -125,7 +127,7 @@ def readLogFile(fnameOrFolder,subtractDark=False,skip_first=0,
 
 def doFolder_azav(folder,nQ=1500,files='*.edf*',force=False,mask=None,
   saveChi=True,poni='pyfai.poni',storageFile='auto',dark=9.9,dezinger=None,
-  qlims=None,monitor='auto',skip_first=0,last=None,srcur_min=80):
+  qlims=None,monitor='auto',skip_first=0,last=None,srcur_min=80,detector=None):
   """ very small wrapper around azav.doFolder, essentially just reading
       the id9 logfile or diagnostics.log
       monitor  : normalization vector that can be given as
@@ -134,8 +136,7 @@ def doFolder_azav(folder,nQ=1500,files='*.edf*',force=False,mask=None,
                3. a string to look for as key in the log, e.g.
                   monitor="pd2ic" would reult in using
                   azavStorage.log.pd2ic
-
-
+      detector : if not None, file names in logfiles will have an _detname appended
  """
 
   try:
@@ -144,6 +145,9 @@ def doFolder_azav(folder,nQ=1500,files='*.edf*',force=False,mask=None,
   except Exception as e:
     log.warn("Could not read log file, trying to read diagnostics.log")
     loginfo = readDiagnostic(folder)
+  if detector is not None:
+    loginfo.file = np.asarray( [f+"_" + detector for f in loginfo.file ] )
+    files = files.replace(".edf","_%s.edf"%detector)
   if storageFile == 'auto' : storageFile = folder +  "/" + "pyfai_1d" + default_extension
 
   if monitor != "auto" and isinstance(monitor,str): monitor = loginfo[monitor]
