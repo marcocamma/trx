@@ -181,3 +181,31 @@ def plotdiffs(data,select=None,err=None,absSignal=None,absSignalScale=10,
 def updateLines(lines,data):
     for l,d in zip(lines,data):
         l.set_ydata(d)
+
+def colorize(vector,vmin=None,vmax=None,ax=None,cmap=plt.cm.jet):
+    """
+    Recolor curves based on values of vector
+
+    Typical usage
+    x = np.linspace(-5,5,200)
+    i = np.arange(100)
+    centers = np.exp(-i/10)
+    amplitudes= np.exp(-i/20)+4
+    sigmas = 1+0.2*np.arctan(i/10)
+    y = np.asarray( [a*np.exp(-(x-xc)**2/2/s**2) for (a,xc,s) \
+            in zip(amplitudes,centers,sigmas)] )
+    plt.plot(x,y.T)
+    colorize(i)
+    """
+    vector = np.asarray(vector)
+
+    # get plot
+    if ax is None: ax=plt.gca()
+
+    # normalize vector
+    if vmin is None: vmin = vector.min()
+    if vmax is None: vmax = vector.max()
+    vector = (vector-vmin)/(vmax-vmin)
+
+    for line,value in zip(ax.lines,vector):
+        line.set_color(cmap(value))
