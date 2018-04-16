@@ -185,6 +185,9 @@ def doFolder_dataRed(azavStorage,funcForAveraging=np.nanmean,
           funcForAveraging=funcForAveraging,chi2_0_max=chi2_0_max)
 
   tr.folder = folder
+  tr.twotheta_rad = azav.twotheta_rad
+  tr.twotheta_deg = azav.twotheta_deg
+
   if outStorageFile == 'auto':
     if not os.path.isdir(folder): folder = "./"
     outStorageFile = folder + "/diffs" + default_extension

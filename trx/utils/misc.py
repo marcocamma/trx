@@ -7,6 +7,7 @@ log = logging.getLogger(__name__)  # __name__ is "foo.bar" here
 import os
 import numpy as np
 from datastorage import DataStorage
+from .string import timeToStr
 np.seterr(all='ignore')
 
 try:
@@ -62,6 +63,22 @@ def saveTxt(fname,q,data,headerv=None,info=None,overwrite=True,columns=''):
     s = "#" + " ".join( [str(c).center(12) for c in columns] )
     header = header + "\n" + s if header != '' else s
   np.savetxt(fname,x.T,fmt="%+10.5e",header=header,comments='')
+
+def save_diffs_xy(diffs,basename="auto",folder="auto"):
+    """ Write files that topas likes """
+    # create folder if necessary
+    if folder =="auto":
+        folder = diffs.folder+'/xy'
+    os.makedirs(folder, exist_ok=True)
+    if basename == "auto":
+        sample = diffs.folder.split('/')[-2]
+        run = diffs.folder.split('/')[-1]
+        basename = "%s_%s" % (sample,run)
+    for i,(y,v) in enumerate(zip(diffs.diffs_plus_ref,diffs.scan)):
+        fname = "%s/%s_%03d_%s.xy" % \
+            (folder,basename,i,timeToStr(v))
+        np.savetxt(fname, np.c_[diffs.twotheta_deg,y],fmt='%f',)
+
 
 def is_same(stuff1,stuff2):
     """ smart compare of stuff """
