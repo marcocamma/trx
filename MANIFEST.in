@@ -1,1 +1,2 @@
 recursive-include trx/utils *.py
+recursive-include trx/data *
