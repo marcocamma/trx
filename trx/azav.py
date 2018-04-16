@@ -103,7 +103,7 @@ def do1d(ai, imgs, mask = None, npt_radial = 600, method = 'csr',safe=True,dark=
       out_s[_i] = sig
     return q,np.squeeze(out_i),np.squeeze(out_s)
 
-def do2d(ai, imgs, mask = None, npt_radial = 600, npt_azim=360,method = 'csr',safe=True,dark=10., polCorr = 1):
+def do2d(ai, imgs, mask = None, npt_radial = 600, npt_azim=360,method = 'csr',safe=True,dark=10., polCorr = 1, unit="q_A^-1"):
     """ ai is a pyFAI azimuthal intagrator 
               it can be defined with pyFAI.load(ponifile)
         mask: True are points to be masked out """
@@ -115,7 +115,7 @@ def do2d(ai, imgs, mask = None, npt_radial = 600, npt_azim=360,method = 'csr',sa
     out = np.empty( ( len(imgs), npt_azim,npt_radial) )
     for _i,img in enumerate(imgs):
       i2d,q,azTheta = ai.integrate2d(img-dark, npt_radial, npt_azim=npt_azim,
-                      mask= mask, safe = safe,unit="q_A^-1", method = method,
+                      mask= mask, safe = safe,unit=unit, method = method,
                       polarization_factor = polCorr )
       out[_i] = i2d
     return q,azTheta,np.squeeze(out)
@@ -331,8 +331,8 @@ def doFolder(folder="./",files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
       err   = np.concatenate( (saved.orig.err  ,err   ) )
     else:
       files = basenames
-    twotheta_rad = utils.qToTwoTheta(q,wavelength=ai.wavelength)
-    twotheta_deg = utils.qToTwoTheta(q,wavelength=ai.wavelength,asDeg=True)
+    twotheta_rad = utils.qToTwoTheta(q,wavelength=ai.wavelength*1e10)
+    twotheta_deg = utils.qToTwoTheta(q,wavelength=ai.wavelength*1e10,asDeg=True)
     orig = dict(data=data.copy(),err=err.copy(),q=q.copy(),
            twotheta_deg=twotheta_deg,twotheta_rad=twotheta_rad,files=files)
     ret = dict(folder=folder,files=files,orig = orig,pyfai=ai_as_dict(ai),
@@ -355,11 +355,16 @@ def doFolder(folder="./",files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
   else:
     idx = np.ones_like(ret.orig.q,dtype=bool)
 
+
+  ret.orig.twotheta_deg = utils.qToTwoTheta(ret.orig.q,wavelength=ai.wavelength*1e10,asDeg=True)
+  ret.orig.twotheta_rad = utils.qToTwoTheta(ret.orig.q,wavelength=ai.wavelength*1e10)
+
   ret.data = ret.orig.data[:,idx]
   ret.err  = ret.orig.err[:,idx]
   ret.q    = ret.orig.q[idx]
-  ret.twotheta_rad = ret.orig.twotheta_rad
-  ret.twotheta_deg = ret.orig.twotheta_deg
+
+  ret.twotheta_rad = ret.orig.twotheta_rad[idx]
+  ret.twotheta_deg = ret.orig.twotheta_deg[idx]
 
   if monitor == 'auto':
     monitor = ret.data.mean(1)
