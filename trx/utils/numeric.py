@@ -80,3 +80,25 @@ def removeBackground(x,data,xlims=None,max_iter=100,background_regions=[],**kw):
     data[i] = data[i] - dualtree.baseline(data[i],max_iter=max_iter,
                         background_regions=background_regions,**kw)
   return x,np.squeeze(data)
+
+
+def find_hist_ranges(hist,x=None,max_frac=0.1):
+
+    high_idx = np.squeeze( np.argwhere(hist>np.nanmax(hist)*max_frac) )
+
+    # remove consecutive indices
+
+    edges = high_idx[ np.gradient(high_idx).astype(int) != 1 ]
+    edges = [high_idx[0],] + list(edges) + [high_idx[-1],]
+
+    if x is not None:
+        edges = x[edges]
+
+    if len(edges)%2 == 1:
+        edges = edges[:-1]
+
+    n_ranges = int(len(edges)/2)
+
+    ranges = edges.reshape( (n_ranges,2) )
+
+    return ranges
