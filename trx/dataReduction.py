@@ -201,7 +201,7 @@ def calcTimeResolvedSignal(scan,data,err=None,reference="min",q=None,
   elif isinstance(reference,str) and reference == "max":
     isRef = (scan == scan.max())
   elif isinstance(reference,(float,int)):
-    isRef = (scan == reference)
+    isRef = np.isclose(scan,reference,atol=1e-12)
   else:
     isRef = reference
   # normalize if needed
