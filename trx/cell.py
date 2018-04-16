@@ -78,11 +78,11 @@ class Monoclinic(object):
     Triclinic.__init__(self,a=a,b=b,c=c,alpha=90,beta=beta,gamma=90)
 
 
-def plotReflections(cell_instance,ax=None,line_kw=dict(),text_kw=dict()):
+def plotReflections(cell_instance,maxQ=3,ax=None,line_kw=dict(),text_kw=dict()):
   import matplotlib.pyplot as plt
   from matplotlib import lines
   import matplotlib.transforms as transforms
-  _,refl_info = cell_instance.reflection_list()
+  _,refl_info = cell_instance.reflection_list(maxQ=maxQ)
   if ax is None: ax = plt.gca()
 
   # the x coords of this transformation are data, and the
