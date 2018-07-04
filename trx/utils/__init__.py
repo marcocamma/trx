@@ -18,3 +18,6 @@ from .scattering import *
 
 from . import string
 from .string import *
+
+from . import spec
+from .spec import *
