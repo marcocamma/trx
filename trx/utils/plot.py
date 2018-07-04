@@ -55,32 +55,36 @@ def plotdata(data,x=None,plotAverage=True,showTrend=True,title=None,\
     one_plot = showTrend or plotAverage
     two_plot = showTrend and plotAverage
 
+    if fig is None:
+        fig = plt.figure()
+
     if one_plot and not two_plot:
-      if fig is None:
-        fig,ax = plt.subplots(1,1)
-      else:
-        fig.clear()
-        ax = fig.axes
+      fig.clear()
+      ax = fig.subplots(1,1)
+
     if two_plot:
-      if fig is None:
-        fig,ax = plt.subplots(2,1,sharex=True)
-      else:
-        ax = fig.axes
+        ax = fig.subplots(2,1,sharex=True)
  
     ax = np.atleast_1d(ax)
     if showTrend:
-      plt.sca(ax[1])
-      plt.pcolormesh(q,x,data)
-      plt.ylabel("image number, 0 being older")
-      plt.xlabel(r"q ($\AA^{-1}$)")
-      plt.clim( *clim )
+        plt.sca(ax[1])
+        plt.pcolormesh(q,x,data)
+        plt.grid()
+        plt.ylabel("image number, 0 being older")
+        plt.xlabel(r"q ($\AA^{-1}$)")
+        plt.clim( *clim )
     if plotAverage:
-        ax[0].plot(q,np.nanmean(data,axis=0))
+        ax[0].plot(q,data[0],label="first")
+        ax[0].plot(q,np.nanmean(data,axis=0),label="mean")
+        ax[0].plot(q,data[-1],label="last")
+        ax[0].legend()
+        ax[0].grid()
+
     if (plotAverage or showTrend) and title is not None:
-      plt.title(title)
+        plt.title(title)
 
 def plotdiffs(data,select=None,err=None,absSignal=None,absSignalScale=10,
-           showErr=False,cmap=plt.cm.jet,fig=None,title=None,plotDiffRef=False):
+           showErr=False,cmap=plt.cm.jet,fig=None,title=None,plotDiffRef=False,labels=None):
     """ Plot difference data
 
         Parameters
@@ -131,14 +135,17 @@ def plotdiffs(data,select=None,err=None,absSignal=None,absSignalScale=10,
  
     lines_diff = []
     lines_abs = []
+
+    if labels is None:
+        labels = [timeToStr(s) for s in scan]
+
     if absSignal is not None:
         line = plt.plot(q,absSignal/absSignalScale,lw=3,
                       color='k',label="absSignal/%s"%str(absSignalScale))[0]
         lines_abs.append(line)
     for linenum,idiff in enumerate(indices):
         color = cmap(idiff/(len(diffs)-1))
-        label = timeToStr(scan[idiff])
-        kw = dict( color = color, label = label )
+        kw = dict( color = color, label = labels[idiff] )
         if err is not None and showErr:
             line = plt.errorbar(q,diffs[idiff],err[idiff],**kw)[0]
             lines_diff.append(line)
@@ -152,6 +159,8 @@ def plotdiffs(data,select=None,err=None,absSignal=None,absSignalScale=10,
     legend = plt.legend(loc=4)
     plt.grid()
     plt.xlabel(r"q ($\AA^{-1}$)")
+    if 'info' in data and "ylabel" in data['info']:
+        plt.ylabel(data['info']['ylabel'])
     # we will set up a dict mapping legend line to orig line, and enable
     # picking on the legend line
     lined = dict()
