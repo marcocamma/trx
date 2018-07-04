@@ -65,6 +65,37 @@ def _delayToNum(delay):
     delay=utils.strToTime(delay)
   return float(delay)
 
+def timesToInfo(times):
+    last = times[-1][:-3]
+    first = times[0][:-3]
+    info = "%s-%s" % (first,last)
+
+    delta_h = int(last.split(":")[0])-int(first.split(":")[0])
+    delta_m = int(last.split(":")[1])-int(first.split(":")[1])
+    if delta_m < 0:
+        delta_h -= 1
+        delta_m += 60
+    if delta_h < 0: delta_h += 24
+    dt = delta_h*60+delta_m
+    if dt < 60:
+        info += "\n%d mins" % dt
+    else:
+        info += "\n%dh %dm (%d mins)"%(delta_h,delta_m,dt)
+    return info
+
+def readReprate(fname):
+    try:
+        with open(fname,"r") as f:
+            lines = f.readlines()
+    except OSError:
+        return 0
+    line = [ temp for temp in lines if temp.find("time between pulses")>0 ][0]
+
+    waittime = line.split(":")[1].split("/")[0]
+    reprate = 1/float(waittime)
+    return reprate
+
+
 def findLogFile(folder):
   files = utils.getFiles(folder,basename='*.log')
 
@@ -92,6 +123,7 @@ def readLogFile(fnameOrFolder,subtractDark=False,skip_first=0,
 
     data = utils.files.readLogFile(fname,skip_first=skip_first,last=last,\
            output = "array",converters=dict(delay=_delayToNum))
+
  
     # work on darks if needed
     if subtractDark:
@@ -119,10 +151,40 @@ def readLogFile(fnameOrFolder,subtractDark=False,skip_first=0,
     else:
         log.warn("Could not find currentmA in logfile, skipping filtering")
 
-    if asDataStorage:
-      data = DataStorage( dict((name,data[name]) for name in data.dtype.names ) )
 
-    return data
+    info = DataStorage()
+
+    # usually folders are named sample/run
+    if os.path.isdir(fnameOrFolder):
+        folder = fnameOrFolder
+    else:
+        folder = os.path.dirname(fnameOrFolder)
+    dirs = folder.split(os.path.sep)
+    ylabel = ".".join(dirs[-2:])
+    info.name = ".".join(dirs[-2:])
+
+
+    try:
+        reprate= readReprate(fname)
+        info.reprate = reprate
+        ylabel += " %.2f Hz"%reprate
+    except:
+        print("Could not read rep rate info")
+
+    try:
+        time_info = timesToInfo(data['time'])
+        info.duration = time_info
+        ylabel += "\n" + time_info
+    except:
+        print("Could not read time duration info")
+
+    info.ylabel = ylabel
+
+    if asDataStorage:
+        data = DataStorage( dict((name,data[name]) for name in data.dtype.names ) )
+
+
+    return data,info
 
 
 def doFolder_azav(folder,nQ=1500,files='*.edf*',force=False,mask=None,
@@ -140,7 +202,7 @@ def doFolder_azav(folder,nQ=1500,files='*.edf*',force=False,mask=None,
  """
 
   try:
-    loginfo = readLogFile(folder,skip_first=skip_first,last=last,
+    loginfo,extra_info = readLogFile(folder,skip_first=skip_first,last=last,
               srcur_min=srcur_min)
   except Exception as e:
     log.warn("Could not read log file, trying to read diagnostics.log")
@@ -156,13 +218,13 @@ def doFolder_azav(folder,nQ=1500,files='*.edf*',force=False,mask=None,
     saveChi=saveChi,poni=poni,storageFile=storageFile,logDict=loginfo,
     dark=dark,save=False,dezinger=dezinger,qlims=qlims,monitor=monitor)
   data.save(storageFile)
+  data.info = extra_info
   return data
-
 
 
 def doFolder_dataRed(azavStorage,funcForAveraging=np.nanmean,
                      outStorageFile='auto',reference='min',chi2_0_max='auto',
-                     saveTxt=True):
+                     saveTxt=True,first=None,last=None):
   """ azavStorage if a DataStorage instance or the filename to read 
   """
 
@@ -178,6 +240,12 @@ def doFolder_dataRed(azavStorage,funcForAveraging=np.nanmean,
     azavStorage  = folder +  "/pyfai_1d" + default_extension
     azav = DataStorage(azavStorage)
 
+  if last is not None or first is not None:
+      idx = slice(first,last)
+      azav.log.delay = azav.log.delay[idx]
+      azav.data_norm = azav.data_norm[idx]
+      azav.err_norm = azav.err_norm[idx]
+
 
   # calculate differences
   tr = dataReduction.calcTimeResolvedSignal(azav.log.delay,azav.data_norm,
@@ -187,6 +255,7 @@ def doFolder_dataRed(azavStorage,funcForAveraging=np.nanmean,
   tr.folder = folder
   tr.twotheta_rad = azav.twotheta_rad
   tr.twotheta_deg = azav.twotheta_deg
+  tr.info = azav.info
 
   if outStorageFile == 'auto':
     if not os.path.isdir(folder): folder = "./"
@@ -258,4 +327,3 @@ def readMotorDump(fnameOrFolder,asDataStorage=True,\
       ret[motor] = motor_pos(dial=data['dial'][imotor],user=data['user'][imotor])
     data = DataStorage(ret)
   return data
-  
