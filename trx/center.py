@@ -486,9 +486,9 @@ def test_find_center_using_rings(verbose=False):
         return ret
 
 
-    r1=dofile("al2o3_capillary_run03_0002.edf", center=(950,950), sigma=2)
-    r2=dofile("calibrants_al2o3_capillary_run03.edf", center=(960,970))
-    r3=dofile("lab6_run03_0017.edf", center=(960,970))
-    r4=dofile("rbmnfe05_run20_0098.edf", center=(960,1400))
-    r5=dofile("run02_0002_rayonix.edf", center=(960,1170))
+    r1=dofile("al2o3_capillary_run03_0002.edf.gz", center=(950,950), sigma=2)
+    r2=dofile("calibrants_al2o3_capillary_run03.edf.gz", center=(960,970))
+    r3=dofile("lab6_run03_0017.edf.gz", center=(960,970))
+    r4=dofile("rbmnfe05_run20_0098.edf.gz", center=(960,1400))
+    r5=dofile("run02_0002_rayonix.edf.gz", center=(960,1170))
     return (r1,r2,r3,r4,r5)
