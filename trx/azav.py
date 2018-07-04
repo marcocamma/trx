@@ -67,6 +67,19 @@ def ai_as_str(ai):
       "# rot[1,2,3] [rad]: %.3f,%.3f,%.3f" % (ai.rot1,ai.rot2,ai.rot3) ]
   return "\n".join(s)
 
+def compare_pyfai(pyfai1,pyfai2):
+    # added instead of comparing string representation, to avoid comparing wavelength ...
+    # that we might want to change without redoing everything ...
+    is_same = True
+    for par in "poni1 poni2 rot1 rot2 rot3 dist pixel1 pixel2".split():
+        if not np.isclose(getattr(pyfai1,par),getattr(pyfai2,par)): # getattr is used because it works with pyfai object and datastorage
+            print("Parameter %s has been found different")
+            is_same = False
+            break
+    return is_same
+
+
+
 def dodezinger(ai, imgs, mask = None, npt_radial = 600, method = 'csr',dezinger=50):
   """ ai is a pyFAI azimuthal intagrator 
               it can be defined with pyFAI.load(ponifile)
@@ -253,14 +266,17 @@ def doFolder(folder="./",files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
     ai = getAI(poni,folder)
     # consistency check (saved images done with same parameters ?)
     if ai is not None:
-      keys_to_compare = "nQ mask dark poni dezinger skip_first last"
+      # pyfai cannot be compared (except for its string representation)
+      # because before first image some fields are None
+      keys_to_compare = "nQ mask dark dezinger skip_first last"
       keys_to_compare = keys_to_compare.split()
       # recursively transform in plain dict and limit comparison to given keys
       saved_args = DataStorage(saved.args).toDict()
       now_args   = DataStorage(args).toDict()
       saved_args = dict( [(k,saved_args[k]) for k in keys_to_compare] )
       now_args   = dict( [(k,now_args[k])   for k in keys_to_compare] )
-      if (saved.pyfai_info != ai_as_str(ai)) or  \
+
+      if (not compare_pyfai(saved.pyfai,ai)) or  \
           np.any( saved.mask != interpretMasks(mask,saved.mask.shape))  or \
           not utils.is_same(saved_args,now_args) :
         log.warn("Found inconsistency between curves already saved and new ones")
@@ -275,7 +291,12 @@ def doFolder(folder="./",files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
         if not utils.is_same(saved_args,now_args):
             for k in now_args.keys():
                 if not utils.is_same(saved_args[k],now_args[k]):
-                        log.warn("Parameter '%s' changed from %s to %s"%\
+                    if isinstance(saved_args[k],dict):
+                        for kk in saved_args[k].keys():
+                            if not utils.is_same(saved_args[k][kk],now_args[k][kk]):
+                                log.warn("Parameter %s.%s"%(k,kk),"IS DIFFERENT",saved_args[k][kk],now_args[k][kk])
+                    else:
+                        log.warn("Parameter '%s' changed from %s to %s\n\n"%\
                                 (k,saved_args[k],now_args[k]))
         args['force'] = True
         saved = doFolder(**args)
@@ -340,7 +361,7 @@ def doFolder(folder="./",files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
     if not save_pyfai:
       ret['pyfai']['chia'] = None
       ret['pyfai']['dssa'] = None
-      ret['pyfai']['q']    = None
+      ret['pyfai']['qa']    = None
       ret['pyfai']['ttha'] = None
  
     ret = DataStorage(ret)
