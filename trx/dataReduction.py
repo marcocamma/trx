@@ -139,7 +139,7 @@ def averageScanPoints(scan,data,errAbs=None,isRef=None,lpower=None,
   diffs_in_scan = []
   chi2_0 = []
   for i,t in enumerate(scan_pos):
-    shot_idx = (scan == t) & ~isRef
+    shot_idx = (scan == t) # & ~isRef
     if shot_idx.sum() == 0:
       log.warn("No data to average for scan point %s"%str(t))
 
