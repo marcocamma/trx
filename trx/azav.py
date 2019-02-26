@@ -17,7 +17,7 @@ from . import filters
 from .mask import interpretMasks
 import re
 import fabio
-import pyFAI
+import pyFAI, pyFAI.azimuthalIntegrator
 
 
 g_default_extension='.h5'
