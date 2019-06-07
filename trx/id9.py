@@ -255,7 +255,7 @@ def doFolder_dataRed(azavStorage,funcForAveraging=np.nanmean,
   tr.folder = folder
   tr.twotheta_rad = azav.twotheta_rad
   tr.twotheta_deg = azav.twotheta_deg
-  tr.info = azav.info
+  tr.info = azav.pyfai_info
 
   if outStorageFile == 'auto':
     if not os.path.isdir(folder): folder = "./"
