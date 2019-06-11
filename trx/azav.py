@@ -45,7 +45,43 @@ def read(fnames):
     data[0] = temp
     for i in range(1,len(fnames)): data[i] = _read(fnames[i])
   return data
-    
+
+
+def ai(pixel, cen, dist, wavelength=None, energy=None):
+    """Initialize pyFAI azimuthal integrator object.
+
+    Parameters
+    ----------
+    pixel: float or tuple
+        pixel size (m)
+    cen: tuple
+        coordinates of image center (pixel)
+    dist: float
+        sample-to-detector distance (m)
+    energy: float (optional)
+        X-ray energy (keV)
+    wavelength: float (optional)
+        X-ray wavelength (m)
+
+    Returns
+    -------
+    pyfai_ai: obj
+        pyFAI azimuthal integrator
+
+    """
+    if isinstance(pixel, tuple):
+        pixelX, pixelY = pixel[0], pixel[1]
+    elif ~hasattr(pixel, "__len__"):
+        pixelX = pixelY = float(pixel)
+    pyfai_ai = pyFAI.azimuthalIntegrator.AzimuthalIntegrator()
+    pyfai_ai.setFit2D(pixelX=pixelX*1e6, pixelY=pixelY*1e6,
+                      centerX=cen[0], centerY=cen[1], directDist=dist*1e3)
+    if energy is not None:
+        wavelength = pyFAI.units.hc/energy*1e-10
+    pyfai_ai.set_wavelength(wavelength)
+    return pyfai_ai
+
+
 def ai_as_dict(ai):
   """ ai is a pyFAI azimuthal intagrator"""
   methods = dir(ai)
