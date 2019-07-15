@@ -7,6 +7,8 @@ log = logging.getLogger(__name__)  # __name__ is "foo.bar" here
 import numpy as np
 np.seterr(all='ignore')
 
+from scipy import constants
+
 def volumeFraction(concentration=1,molWeight=17,density=1.347):
   """ molWeight is kDa 
       concentration in mM
@@ -70,3 +72,11 @@ def qToTwoTheta(q,asDeg=False,**kw):
   theta = 2*np.arcsin(q*kw["wavelength"]/4/np.pi)
   if asDeg: theta = np.rad2deg(theta)
   return theta
+
+def xray_wavelength(energy):
+    """ Convert energy (keV) to wavelength (Ang) """
+    return constants.Planck*constants.c/np.asarray(energy)/constants.e*1e7
+
+def xray_energy(wavelength):
+    """ Convert wavelength (Ang) to energy (keV) """
+    return constants.Planck*constants.c/np.asarray(wavelength)/constants.e*1e7

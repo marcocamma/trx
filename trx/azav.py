@@ -249,7 +249,7 @@ def doFolder(folder="./",files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
   folder = folder.replace("//","/").rstrip("/")
 
   # can't store aritrary objects
-  if isinstance(args['poni'],pyFAI.AzimuthalIntegrator):
+  if isinstance(args['poni'],pyFAI.azimuthalIntegrator.AzimuthalIntegrator):
     args['poni'] = ai_as_dict(args['poni'])
 
   if storageFile == 'auto':
