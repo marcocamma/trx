@@ -59,7 +59,7 @@ def _findDark(line):
   return float(value)
 
 def _delayToNum(delay):
-  if delay.decode('ascii') == 'off':
+  if delay == 'off':
     delay = -10.0 # .0 is necessary to force float when converting arrays
   else:
     delay=utils.strToTime(delay)
