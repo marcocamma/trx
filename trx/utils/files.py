@@ -52,8 +52,8 @@ def readLogFile(fname,skip_first=0,last=None,converters=None,
   # as it does not like the space ...
   names = lines[iline-1][1:].split()
 
-  data=np.genfromtxt(fname,skip_header=iline,names=names,dtype=None,
-       converters = converters, excludelist = [] )
+  data=np.genfromtxt(fname, skip_header=iline, names=names, dtype=None,
+                     encoding=None, converters=converters, excludelist=[])
 
   # skip firsts/lasts
   data = data[skip_first:last]
