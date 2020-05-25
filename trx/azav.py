@@ -423,11 +423,20 @@ def doFolder(folder="./",files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
   ret.twotheta_rad = ret.orig.twotheta_rad[idx]
   ret.twotheta_deg = ret.orig.twotheta_deg[idx]
 
-  if monitor == 'auto':
-    monitor = ret.data.mean(1)
-  elif isinstance(monitor,(tuple,list)):
-    idx_norm = (ret.q >= monitor[0]) & (ret.q <= monitor[1])
-    monitor = ret.data[:,idx_norm].mean(1)
+  if isinstance(monitor, str):
+    if monitor == 'auto':
+      monitor = ret.data.mean(1)
+    else:
+      raise ValueError("'monitor' must be ndarray, 2-D tuple/list or 'auto'.")
+  elif isinstance(monitor, (tuple, list)):
+    if len(monitor) == 2:
+      idx_norm = (ret.q >= monitor[0]) & (ret.q <= monitor[1])
+      monitor = ret.data[:, idx_norm].mean(1)
+    else:
+      raise ValueError("'monitor' must be ndarray, 2-D tuple/list or 'auto'.")
+  elif not isinstance(monitor, np.ndarray):
+      raise ValueError("'monitor' must be ndarray, 2-D tuplelist or 'auto'.")
+
   ret["data_norm"] = ret.data/monitor[:,np.newaxis]
   ret["err_norm"] = ret.err/monitor[:,np.newaxis]
   ret["monitor"] = monitor[:,np.newaxis]
