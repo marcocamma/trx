@@ -241,7 +241,7 @@ def doFolder(folder="./",files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
           gzipped giles)
       nQ : int
           number of Q-points (equispaced)
-      monitor : array or (qmin,qmax)
+      monitor : array or (qmin,qmax) or None
           normalization array (or list for q range normalization)
       force : True|False
           if True, redo from beginning even if previous data are found
@@ -423,14 +423,28 @@ def doFolder(folder="./",files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
   ret.twotheta_rad = ret.orig.twotheta_rad[idx]
   ret.twotheta_deg = ret.orig.twotheta_deg[idx]
 
-  if monitor == 'auto':
-    monitor = ret.data.mean(1)
-  elif isinstance(monitor,(tuple,list)):
-    idx_norm = (ret.q >= monitor[0]) & (ret.q <= monitor[1])
-    monitor = ret.data[:,idx_norm].mean(1)
-  ret["data_norm"] = ret.data/monitor[:,np.newaxis]
-  ret["err_norm"] = ret.err/monitor[:,np.newaxis]
-  ret["monitor"] = monitor[:,np.newaxis]
+  if isinstance(monitor, str):
+    if monitor == 'auto':
+      monitor = ret.data.mean(1)
+    else:
+      raise ValueError("'monitor' must be ndarray, 2-D tuple/list, 'auto' or None.")
+  elif isinstance(monitor, (tuple, list)):
+    if len(monitor) == 2:
+      idx_norm = (ret.q >= monitor[0]) & (ret.q <= monitor[1])
+      monitor = ret.data[:, idx_norm].mean(1)
+    else:
+      raise ValueError("'monitor' must be ndarray, 2-D tuple/list, 'auto' or None.")
+  elif not isinstance(monitor, np.ndarray) and monitor is not None:
+      raise ValueError("'monitor' must be ndarray, 2-D tuple/list, 'auto' or None.")
+
+  if monitor is not None:
+    ret["data_norm"] = ret.data/monitor[:,np.newaxis]
+    ret["err_norm"] = ret.err/monitor[:,np.newaxis]
+    ret["monitor"] = monitor[:,np.newaxis]
+  else:
+    ret["data_norm"] = None
+    ret["err_norm"] = None
+    ret["monitor"] = None
 
   # add info from logDict if provided
   if logDict is not None: ret['log']=logDict
