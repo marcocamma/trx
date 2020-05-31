@@ -318,22 +318,26 @@ def doFolder(folder="./",files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
         log.warn("Found inconsistency between curves already saved and new ones")
         log.warn("Redoing saved ones with new parameters")
         if (saved.pyfai_info != ai_as_str(ai)):
-            log.warn("Saved pyfai parameters %s"%saved.pyfai_info)
-            log.warn("New pyfai parameters %s"%ai_as_str(ai))
+            log.warn("pyfai parameters changed from:\n%s" % saved.pyfai_info +
+                     "\nto:\n%s" % ai_as_str(ai))
         if np.any(saved.mask != interpretMasks(mask,saved.mask.shape)):
-            log.warn("Masks are different")
-            log.warn("Old mask",saved.mask)
-            log.warn("New mask",interpretMasks(mask,saved.mask.shape))
+            log.warn("Mask changed from:\n%s" % saved.mask +
+                     "\nto:\n%s" % interpretMasks(mask, saved.mask.shape))
         if not utils.is_same(saved_args,now_args):
-            for k in now_args.keys():
+            for k in set(now_args.keys())-set(['mask']):
                 if not utils.is_same(saved_args[k],now_args[k]):
                     if isinstance(saved_args[k],dict):
                         for kk in saved_args[k].keys():
                             if not utils.is_same(saved_args[k][kk],now_args[k][kk]):
-                                log.warn("Parameter %s.%s"%(k,kk),"IS DIFFERENT",saved_args[k][kk],now_args[k][kk])
+                                log.warn("Parameter %s.%s" % (k, kk) +
+                                         "IS DIFFERENT", saved_args[k][kk],
+                                         now_args[k][kk])
                     else:
-                        log.warn("Parameter '%s' changed from %s to %s\n\n"%\
-                                (k,saved_args[k],now_args[k]))
+                        log_str = " %s to %s" % (saved_args[k], now_args[k])
+                        if len(log_str) > 20:
+                            log_str = ":\n%s\nto:\n%s" %(saved_args[k],
+                                                           now_args[k])
+                        log.warn("Parameter '%s' changed from" % k + log_str)
         args['force'] = True
         saved = doFolder(**args)
   else:
