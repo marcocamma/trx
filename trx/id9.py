@@ -169,14 +169,14 @@ def readLogFile(fnameOrFolder,subtractDark=False,skip_first=0,
         info.reprate = reprate
         ylabel += " %.2f Hz"%reprate
     except:
-        print("Could not read rep rate info")
+        log.warn("Could not read time duration info")
 
     try:
         time_info = timesToInfo(data['time'])
         info.duration = time_info
         ylabel += "\n" + time_info
     except:
-        print("Could not read time duration info")
+        log.warn("Could not read time duration info")
 
     info.ylabel = ylabel
 
