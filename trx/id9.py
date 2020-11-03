@@ -8,6 +8,7 @@ import time
 import os
 import collections
 import numpy as np
+import copy
 from . import azav
 from . import dataReduction
 from . import utils
@@ -224,7 +225,7 @@ def doFolder_azav(folder,nQ=1500,files='*.edf*',force=False,mask=None,
 
 def doFolder_dataRed(azavStorage,funcForAveraging=np.nanmean,
                      outStorageFile='auto',reference='min',chi2_0_max='auto',
-                     saveTxt=True,first=None,last=None):
+                     saveTxt=True,first=None,last=None,idx=None):
   """ azavStorage if a DataStorage instance or the filename to read 
   """
 
@@ -240,12 +241,21 @@ def doFolder_dataRed(azavStorage,funcForAveraging=np.nanmean,
     azavStorage  = folder +  "/pyfai_1d" + default_extension
     azav = DataStorage(azavStorage)
 
-  if last is not None or first is not None:
+  azav = copy.deepcopy(azav)
+
+  if last is not None or first is not None and idx is None:
       idx = slice(first,last)
+
+  if idx is not None:
       azav.log.delay = azav.log.delay[idx]
       azav.data_norm = azav.data_norm[idx]
       azav.err_norm = azav.err_norm[idx]
 
+  # laser off is saved as -10s, if using the automatic "min"
+  # preventing from using the off images
+  # use reference=-10 if this is what you want
+  if reference == "min":
+      reference = azav.log.delay[azav.log.delay!= -10].min()
 
   # calculate differences
   tr = dataReduction.calcTimeResolvedSignal(azav.log.delay,azav.data_norm,

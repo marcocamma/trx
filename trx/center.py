@@ -332,7 +332,7 @@ def find_center_using_rings(img, sigma=3, high_threshold=20, low_threshold=10,
 
         if plot:
             plt.figure("hist")
-            plt.hist(dist,1000,histtype='step',**color,label="ring %d"%(i+1))
+            plt.hist(dist,1000,histtype='step',label="ring %d"%(i+1),**color)
 
 
         ## next is how to find the regions of the historam that should
@@ -433,8 +433,8 @@ def find_center_using_rings(img, sigma=3, high_threshold=20, low_threshold=10,
             #plt.imshow(image)
             plt.plot(points[idx, 0], points[idx, 1], 'b.', markersize=1,**color)
             plt.plot(center[0],center[1],".",markersize=20,**color)
-            circle = plt.Circle(fit.center,radius=fit.radius,**color,
-                    fill=False)
+            circle = plt.Circle(fit.center,radius=fit.radius,
+                    fill=False,**color)
             ax = plt.gca()
             ax.add_patch(circle)
             plt.pause(0.01)
