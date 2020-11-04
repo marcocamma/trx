@@ -225,9 +225,10 @@ def doFolder_azav(folder,nQ=1500,files='*.edf*',force=False,mask=None,
 
 def doFolder_dataRed(azavStorage,funcForAveraging=np.nanmean,
                      outStorageFile='auto',reference='min',chi2_0_max='auto',
-                     saveTxt=True,first=None,last=None,idx=None):
+                     saveTxt=True,first=None,last=None,idx=None,split_angle=False):
   """ azavStorage if a DataStorage instance or the filename to read 
   """
+
 
   if isinstance(azavStorage,DataStorage):
     azav = azavStorage
@@ -241,6 +242,26 @@ def doFolder_dataRed(azavStorage,funcForAveraging=np.nanmean,
     azavStorage  = folder +  "/pyfai_1d" + default_extension
     azav = DataStorage(azavStorage)
 
+
+  if split_angle:
+      angles = np.unique(azav.log.angle)
+      diffs = []
+      for angle in angles:
+          idx = azav.log.angle == angle
+          diffs.append(
+                  doFolder_dataRed(azav,funcForAveraging=funcForAveraging,
+                      outStorageFile=None,reference=reference,
+                      chi2_0_max=chi2_0_max,saveTxt=False,
+                      idx=idx,split_angle=False)
+                  )
+      ret = DataStorage(angles=angles,diffs=diffs)
+      if outStorageFile == 'auto':
+        if not os.path.isdir(folder): folder = "./"
+        outStorageFile = folder + "/diffs" + default_extension
+      if outStorageFile is not None:
+        ret.save(outStorageFile)
+      return ret
+
   azav = copy.deepcopy(azav)
 
   if last is not None or first is not None and idx is None:
@@ -250,6 +271,7 @@ def doFolder_dataRed(azavStorage,funcForAveraging=np.nanmean,
       azav.log.delay = azav.log.delay[idx]
       azav.data_norm = azav.data_norm[idx]
       azav.err_norm = azav.err_norm[idx]
+
 
   # laser off is saved as -10s, if using the automatic "min"
   # preventing from using the off images
@@ -275,7 +297,8 @@ def doFolder_dataRed(azavStorage,funcForAveraging=np.nanmean,
   # save txt and npz file
   if saveTxt: dataReduction.saveTxt(folder,tr,info=azav.pyfai_info)
 
-  tr.save(outStorageFile)
+  if outStorageFile is not None:
+    tr.save(outStorageFile)
 
   return tr
 
