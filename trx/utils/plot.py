@@ -110,7 +110,7 @@ def plotdiffs(data,select=None,err=None,absSignal=None,absSignalScale=10,
         fig:
           matplotlib fig instance to use, if None creates a new one
         title: str
-          title to use for plot (if None, no title is added)
+          title to use for plot (if None, data.folder is used)
         plotDiffRef:
           plot not only the diff but also the diffs_plus_ref (if present in data)
     """
@@ -155,7 +155,9 @@ def plotdiffs(data,select=None,err=None,absSignal=None,absSignalScale=10,
             if diffs_abs is not None and plotDiffRef:
                 line = plt.plot(q,diffs_abs[idiff],color=color)[0]
                 lines_abs.append(line)
-    if title is not None: fig.axes[0].set_title(title)
+    if title is None and hasattr(data,"folder"): title = data.folder
+    if title is not None:
+        fig.axes[0].set_title(title)
     legend = plt.legend(loc=4)
     plt.grid()
     plt.xlabel(r"q ($\AA^{-1}$)")
