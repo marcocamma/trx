@@ -12,6 +12,6 @@ from datastorage import DataStorage, read, save
 try:
   from . import peaks
 except ImportError as err:
-  print("Can't import submodule peaks, reason was:",err
+  print("Can't import submodule peaks, reason was:",err)
 
 __version__ = "0.6.6"
