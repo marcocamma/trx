@@ -148,7 +148,7 @@ def plotdiffs(
         ax:
           matplotlib axes instance to use, if None creates a new one
         title: str
-          title to use for plot (if None, no title is added)
+          title to use for plot (if None, data.folder is used)
         plotDiffRef:
           plot not only the diff but also the diffs_plus_ref (if present in data)
     """
@@ -203,6 +203,8 @@ def plotdiffs(
             if diffs_abs is not None and plotDiffRef:
                 line = ax.plot(q, diffs_abs[idiff], color=color)[0]
                 lines_abs.append(line)
+    if title is not None: fig.axes[0].set_title(title)
+    if title is None and hasattr(data,"folder"): title = data.folder
     if title is not None:
         fig.axes[0].set_title(title)
     legend = plt.legend(loc=4)

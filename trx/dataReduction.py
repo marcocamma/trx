@@ -11,63 +11,80 @@ from . import filters
 from datastorage import DataStorage
 import os
 
-def subtractReferences(i,idx_ref, useRatio = False):
-  """ given data in i (first index is shot num) and the indeces of the 
-      references (idx_ref, array of integers) it interpolates the closest
-      reference data for each shot and subtracts it (or divides it, depending
-      on useRatio = [True|False]; 
-      Note: it works in place (i.e. it modifies i) """
-  iref=np.empty_like(i)
-  idx_ref = np.squeeze(idx_ref)
-  idx_ref = np.atleast_1d(idx_ref)
-  # sometime there is just one reference (e.g. sample scans)
-  if idx_ref.shape[0] == 1:
-    if useRatio:
-      return i/i[idx_ref]
-    else:
-      return i-i[idx_ref]
-  # references before first ref are "first ref"
-  iref[:idx_ref[0]] = i[idx_ref[0]]
-  # references after last ref are "last ref"
-  iref[idx_ref[-1]:] = i[idx_ref[-1]]
-  _ref = 0
-  for _i in range(idx_ref[0],idx_ref[-1]):
-    if _i in idx_ref: continue
-    idx_ref_before = idx_ref[_ref]
-    idx_ref_after  = idx_ref[_ref+1]
-    ref_before = i[idx_ref_before]
-    ref_after  = i[idx_ref_after]
-    weight_before = float(_i-idx_ref_before)/(idx_ref_after-idx_ref_before)
-    weight_after  = 1-weight_before
-    # normal reference for an on chi, the weighted average
-    iref[_i]      = weight_before*ref_before + weight_after*ref_after
-    if _i>=idx_ref_after-1: _ref += 1
-    log.debug("For image %d : %d-%d"%(_i,idx_ref_before,idx_ref_after))
-  # take care of the reference for the references ...
-  if len(idx_ref) >  2:
-    iref[idx_ref[0]] = i[idx_ref[1]]
-    iref[idx_ref[-1]] = i[idx_ref[-2]]
-    for _i in range(1,len(idx_ref)-1):
-      idx_ref_before = idx_ref[_i-1]
-      idx_ref_after  = idx_ref[_i+1]
-      ref_before = i[idx_ref_before]
-      ref_after  = i[idx_ref_after]
-      weight_before = float(idx_ref[_i]-idx_ref_before)/(idx_ref_after-idx_ref_before)
-      weight_after  = 1-weight_before
-      # normal reference for an on chi, the weighted average
-      iref[idx_ref[_i]]    = weight_before*ref_before + weight_after*ref_after
-      log.debug("For reference image %d : %d-%d"%(idx_ref[_i],idx_ref_before,idx_ref_after))
-  else:
-    #print(idx_ref)
-    #print(iref[idx_ref])
-    iref[idx_ref]=i[idx_ref[0]]
-    #print(iref[idx_ref])
-  if useRatio:
-    i /= iref
-  else:
-    i -= iref
-  return i
 
+def interp_references(i, idx_ref):
+    """Linear interpolation of reference curves.
+
+    The reference curve for each "shot" is calculated as the average between
+    its two closest reference curves. A weight is introduced in the average
+    to account for the distance between the shot and each of the two closest
+    reference curves.
+
+    The first available reference curve is used as the reference for all
+    initial shots. The last available reference curve is used as the reference
+    for all final shots.
+
+    The reference curve for each "reference" is not the reference curve itself,
+    but the average of the two closest reference curves.
+
+    Parameters
+    ----------
+    i : (M, N) ndarray
+        Input data. The array first index corresponds to the "shot" number.
+    idx_ref : ndarray
+        Indeces of reference curves.
+
+    Returns
+    -------
+    iref : (M, N) ndarray or (N,) ndarray
+        Reference curves for each curve in 'i'. If only one reference curve
+        is available, a (N,) ndarray is returned.
+
+    """
+
+    iref = np.empty_like(i)
+    idx_ref = np.squeeze(idx_ref)
+    idx_ref = np.atleast_1d(idx_ref)
+
+    # sometimes there is just one reference (e.g. sample scans)
+    if idx_ref.shape[0] == 1:
+        iref = i[idx_ref]
+        return iref
+
+    for (idx_ref_before, idx_ref_after) in zip(idx_ref[:-1], idx_ref[1:]):
+        ref_before = i[idx_ref_before]
+        ref_after = i[idx_ref_after]
+        for idx in range(idx_ref_before, idx_ref_after):
+            slope = (ref_after-ref_before)/float(idx_ref_after-idx_ref_before)
+            iref[idx] = ref_before + slope*float(idx-idx_ref_before)
+            log.debug("Refs for shot %d: " % idx +
+                      "%d, %d" % (idx_ref_before, idx_ref_after))
+
+    # for all curvers before first ref: use first ref
+    iref[:idx_ref[0]] = i[idx_ref[0]]
+
+    # for all curves after last ref: use last ref
+    iref[idx_ref[-1]:] = i[idx_ref[-1]]
+
+    # take care of the reference for the references ...
+    for (idx_ref_before, idx, idx_ref_after) in zip(idx_ref, idx_ref[1:],
+                                                    idx_ref[2:-1]):
+        ref_before = i[idx_ref_before]
+        ref_after = i[idx_ref_after]
+        slope = (ref_after-ref_before)/float(idx_ref_after-idx_ref_before)
+        iref[idx] = ref_before + slope*float(idx-idx_ref_before)
+        log.debug("Refs for reference %d: " % idx +
+                  "%d, %d" % (idx_ref_before, idx_ref_after))
+
+    # for first ref: use second ref
+    iref[idx_ref[0]] = i[idx_ref[1]]
+
+    # for last ref: use second last ref
+    iref[idx_ref[-1]] = i[idx_ref[-2]]
+
+    return iref
+
+ 
 def averageScanPoints(scan,data,errAbs=None,isRef=None,lpower=None,
     useRatio=False,funcForAveraging=np.nanmean,chi2_0_max='auto'):
   """ Average data for equivalent values in 'scan' array
@@ -109,20 +126,27 @@ def averageScanPoints(scan,data,errAbs=None,isRef=None,lpower=None,
   average = np.mean(data,axis=0)
   median  = np.median(data,axis=0)
 
-  if isRef is None: isRef = np.zeros( data.shape[0], dtype=bool )
-  isRef = np.asarray(isRef).astype(bool)
-  assert data.shape[0] == isRef.shape[0], \
-    "Size mismatch, data is %d, isRef %d"%(data.shape[0],isRef.shape[0])
-
-  # subtract reference only is there is at least one
-  if isRef.sum()>0:
-    # create a copy (subtractReferences works in place)
-    diff_all = subtractReferences(data.copy(),np.argwhere(isRef),
-               useRatio=useRatio)
-    ref_average = funcForAveraging(data[isRef],axis=0)
-  else:
+  if isRef is None:
     diff_all = data
-    ref_average = np.zeros_like(average)
+    if useRatio:
+      ref_average = np.ones_like(average)
+    else:
+      ref_average = np.zeros_like(average)
+  else:
+
+    isRef = np.asarray(isRef).astype(bool)
+
+    assert data.shape[0] == isRef.shape[0], \
+      "Size mismatch, data is %d, isRef %d"%(data.shape[0],isRef.shape[0])
+
+    # create a copy (subtractReferences works in place)
+    refs = interp_references(data.copy(), np.argwhere(isRef))
+    if useRatio:
+      diff_all = data/refs
+    else:
+      diff_all = data - refs
+    
+    ref_average = funcForAveraging(data[isRef],axis=0)
 
   # normalize signal for laser intensity if provided
   if lpower is not None:

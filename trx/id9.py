@@ -8,6 +8,7 @@ import time
 import os
 import collections
 import numpy as np
+import copy
 from . import azav
 from . import dataReduction
 from . import utils
@@ -59,7 +60,7 @@ def _findDark(line):
   return float(value)
 
 def _delayToNum(delay):
-  if delay.decode('ascii') == 'off':
+  if delay == 'off':
     delay = -10.0 # .0 is necessary to force float when converting arrays
   else:
     delay=utils.strToTime(delay)
@@ -169,14 +170,14 @@ def readLogFile(fnameOrFolder,subtractDark=False,skip_first=0,
         info.reprate = reprate
         ylabel += " %.2f Hz"%reprate
     except:
-        print("Could not read rep rate info")
+        log.warn("Could not read time duration info")
 
     try:
         time_info = timesToInfo(data['time'])
         info.duration = time_info
         ylabel += "\n" + time_info
     except:
-        print("Could not read time duration info")
+        log.warn("Could not read time duration info")
 
     info.ylabel = ylabel
 
@@ -224,9 +225,10 @@ def doFolder_azav(folder,nQ=1500,files='*.edf*',force=False,mask=None,
 
 def doFolder_dataRed(azavStorage,funcForAveraging=np.nanmean,
                      outStorageFile='auto',reference='min',chi2_0_max='auto',
-                     saveTxt=True,first=None,last=None):
+                     saveTxt=True,first=None,last=None,idx=None,split_angle=False):
   """ azavStorage if a DataStorage instance or the filename to read 
   """
+
 
   if isinstance(azavStorage,DataStorage):
     azav = azavStorage
@@ -240,12 +242,42 @@ def doFolder_dataRed(azavStorage,funcForAveraging=np.nanmean,
     azavStorage  = folder +  "/pyfai_1d" + default_extension
     azav = DataStorage(azavStorage)
 
-  if last is not None or first is not None:
+
+  if split_angle:
+      angles = np.unique(azav.log.angle)
+      diffs = []
+      for angle in angles:
+          idx = azav.log.angle == angle
+          diffs.append(
+                  doFolder_dataRed(azav,funcForAveraging=funcForAveraging,
+                      outStorageFile=None,reference=reference,
+                      chi2_0_max=chi2_0_max,saveTxt=False,
+                      idx=idx,split_angle=False)
+                  )
+      ret = DataStorage(angles=angles,diffs=diffs)
+      if outStorageFile == 'auto':
+        if not os.path.isdir(folder): folder = "./"
+        outStorageFile = folder + "/diffs" + default_extension
+      if outStorageFile is not None:
+        ret.save(outStorageFile)
+      return ret
+
+  azav = copy.deepcopy(azav)
+
+  if last is not None or first is not None and idx is None:
       idx = slice(first,last)
+
+  if idx is not None:
       azav.log.delay = azav.log.delay[idx]
       azav.data_norm = azav.data_norm[idx]
       azav.err_norm = azav.err_norm[idx]
 
+
+  # laser off is saved as -10s, if using the automatic "min"
+  # preventing from using the off images
+  # use reference=-10 if this is what you want
+  if reference == "min":
+      reference = azav.log.delay[azav.log.delay!= -10].min()
 
   # calculate differences
   tr = dataReduction.calcTimeResolvedSignal(azav.log.delay,azav.data_norm,
@@ -265,7 +297,8 @@ def doFolder_dataRed(azavStorage,funcForAveraging=np.nanmean,
   # save txt and npz file
   if saveTxt: dataReduction.saveTxt(folder,tr,info=azav.pyfai_info)
 
-  tr.save(outStorageFile)
+  if outStorageFile is not None:
+    tr.save(outStorageFile)
 
   return tr
 

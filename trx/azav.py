@@ -45,7 +45,43 @@ def read(fnames):
     data[0] = temp
     for i in range(1,len(fnames)): data[i] = _read(fnames[i])
   return data
-    
+
+
+def ai(pixel, cen, dist, wavelength=None, energy=None):
+    """Initialize pyFAI azimuthal integrator object.
+
+    Parameters
+    ----------
+    pixel: float or tuple
+        pixel size (m)
+    cen: tuple
+        coordinates of image center (pixel)
+    dist: float
+        sample-to-detector distance (m)
+    energy: float (optional)
+        X-ray energy (keV)
+    wavelength: float (optional)
+        X-ray wavelength (m)
+
+    Returns
+    -------
+    pyfai_ai: obj
+        pyFAI azimuthal integrator
+
+    """
+    if isinstance(pixel, tuple):
+        pixelX, pixelY = pixel[0], pixel[1]
+    elif ~hasattr(pixel, "__len__"):
+        pixelX = pixelY = float(pixel)
+    pyfai_ai = pyFAI.azimuthalIntegrator.AzimuthalIntegrator()
+    pyfai_ai.setFit2D(pixelX=pixelX*1e6, pixelY=pixelY*1e6,
+                      centerX=cen[0], centerY=cen[1], directDist=dist*1e3)
+    if energy is not None:
+        wavelength = pyFAI.units.hc/energy*1e-10
+    pyfai_ai.set_wavelength(wavelength)
+    return pyfai_ai
+
+
 def ai_as_dict(ai):
   """ ai is a pyFAI azimuthal intagrator"""
   methods = dir(ai)
@@ -205,7 +241,7 @@ def doFolder(folder="./",files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
           gzipped giles)
       nQ : int
           number of Q-points (equispaced)
-      monitor : array or (qmin,qmax)
+      monitor : array or (qmin,qmax) or None
           normalization array (or list for q range normalization)
       force : True|False
           if True, redo from beginning even if previous data are found
@@ -282,22 +318,26 @@ def doFolder(folder="./",files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
         log.warn("Found inconsistency between curves already saved and new ones")
         log.warn("Redoing saved ones with new parameters")
         if (saved.pyfai_info != ai_as_str(ai)):
-            log.warn("Saved pyfai parameters %s"%saved.pyfai_info)
-            log.warn("New pyfai parameters %s"%ai_as_str(ai))
+            log.warn("pyfai parameters changed from:\n%s" % saved.pyfai_info +
+                     "\nto:\n%s" % ai_as_str(ai))
         if np.any(saved.mask != interpretMasks(mask,saved.mask.shape)):
-            log.warn("Masks are different")
-            log.warn("Old mask",saved.mask)
-            log.warn("New mask",interpretMasks(mask,saved.mask.shape))
+            log.warn("Mask changed from:\n%s" % saved.mask +
+                     "\nto:\n%s" % interpretMasks(mask, saved.mask.shape))
         if not utils.is_same(saved_args,now_args):
-            for k in now_args.keys():
+            for k in set(now_args.keys())-set(['mask']):
                 if not utils.is_same(saved_args[k],now_args[k]):
                     if isinstance(saved_args[k],dict):
                         for kk in saved_args[k].keys():
                             if not utils.is_same(saved_args[k][kk],now_args[k][kk]):
-                                log.warn("Parameter %s.%s"%(k,kk),"IS DIFFERENT",saved_args[k][kk],now_args[k][kk])
+                                log.warn("Parameter %s.%s" % (k, kk) +
+                                         "IS DIFFERENT", saved_args[k][kk],
+                                         now_args[k][kk])
                     else:
-                        log.warn("Parameter '%s' changed from %s to %s\n\n"%\
-                                (k,saved_args[k],now_args[k]))
+                        log_str = " %s to %s" % (saved_args[k], now_args[k])
+                        if len(log_str) > 20:
+                            log_str = ":\n%s\nto:\n%s" %(saved_args[k],
+                                                           now_args[k])
+                        log.warn("Parameter '%s' changed from" % k + log_str)
         args['force'] = True
         saved = doFolder(**args)
   else:
@@ -387,14 +427,28 @@ def doFolder(folder="./",files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
   ret.twotheta_rad = ret.orig.twotheta_rad[idx]
   ret.twotheta_deg = ret.orig.twotheta_deg[idx]
 
-  if monitor == 'auto':
-    monitor = ret.data.mean(1)
-  elif isinstance(monitor,(tuple,list)):
-    idx_norm = (ret.q >= monitor[0]) & (ret.q <= monitor[1])
-    monitor = ret.data[:,idx_norm].mean(1)
-  ret["data_norm"] = ret.data/monitor[:,np.newaxis]
-  ret["err_norm"] = ret.err/monitor[:,np.newaxis]
-  ret["monitor"] = monitor[:,np.newaxis]
+  if isinstance(monitor, str):
+    if monitor == 'auto':
+      monitor = ret.data.mean(1)
+    else:
+      raise ValueError("'monitor' must be ndarray, 2-D tuple/list, 'auto' or None.")
+  elif isinstance(monitor, (tuple, list)):
+    if len(monitor) == 2:
+      idx_norm = (ret.q >= monitor[0]) & (ret.q <= monitor[1])
+      monitor = ret.data[:, idx_norm].mean(1)
+    else:
+      raise ValueError("'monitor' must be ndarray, 2-D tuple/list, 'auto' or None.")
+  elif not isinstance(monitor, np.ndarray) and monitor is not None:
+      raise ValueError("'monitor' must be ndarray, 2-D tuple/list, 'auto' or None.")
+
+  if monitor is not None:
+    ret["data_norm"] = ret.data/monitor[:,np.newaxis]
+    ret["err_norm"] = ret.err/monitor[:,np.newaxis]
+    ret["monitor"] = monitor[:,np.newaxis]
+  else:
+    ret["data_norm"] = None
+    ret["err_norm"] = None
+    ret["monitor"] = None
 
   # add info from logDict if provided
   if logDict is not None: ret['log']=logDict
