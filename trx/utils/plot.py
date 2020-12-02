@@ -1,20 +1,32 @@
 # -*- coding: utf-8 -*-
-from __future__ import print_function,division,absolute_import
+from __future__ import print_function, division, absolute_import
 
 import logging
+
 log = logging.getLogger(__name__)  # __name__ is "foo.bar" here
 
 import numpy as np
-np.seterr(all='ignore')
+
+np.seterr(all="ignore")
 from .string import timeToStr
 
 try:
-  import matplotlib.pyplot as plt
+    import matplotlib.pyplot as plt
 except ImportError:
-  log.warn("Can't import matplotlib !")
+    log.warn("Can't import matplotlib !")
 
-def plotdata(data,x=None,plotAverage=True,showTrend=True,title=None,\
-      clim='auto',fig=None):
+
+def plotdata(
+    data,
+    x=None,
+    plotAverage=True,
+    showTrend=True,
+    title=None,
+    clim="auto",
+    fig=None,
+    first=None,
+    last=None,
+):
     """ Plot 2D array to look for trends/stability or outlier
 
         It usually works best with normalized data
@@ -37,21 +49,32 @@ def plotdata(data,x=None,plotAverage=True,showTrend=True,title=None,\
           color scale to use, is 'auto' 1.5%,98.5% percentiles are used
         fig:
           matplotlib fig instance to use, if None creates a new one
+        first, last: None or int
+          to plot only a subset
         title: str
           title to use for plot (if None and data['folder'] exists
           the value is used as title
           
     """
-    if isinstance(data,np.ndarray):
-      q = np.arange( data.shape[-1] )
+    if isinstance(data, np.ndarray):
+        q = np.arange(data.shape[-1])
     else:
-      if title is None and 'folder' in data: title = data["folder"]
-      q = data["q"]
-      data = data["data"]
-    if not (plotAverage or showTrend): return
+        if title is None and "folder" in data:
+            title = data["folder"]
+        q = data["q"]
+        data = data["data"]
+    if not (plotAverage or showTrend):
+        return
 
-    if x is None: x = np.arange(data.shape[0])
-    if clim == 'auto': clim = np.nanpercentile(data,(1.5,98.5))
+    if x is None:
+        x = np.arange(data.shape[0])
+
+    # take only images of interest
+    data = data[first:last]
+    x = x[first:last]
+
+    if clim == "auto":
+        clim = np.nanpercentile(data, (1.5, 98.5))
     one_plot = showTrend or plotAverage
     two_plot = showTrend and plotAverage
 
@@ -59,32 +82,45 @@ def plotdata(data,x=None,plotAverage=True,showTrend=True,title=None,\
         fig = plt.figure()
 
     if one_plot and not two_plot:
-      fig.clear()
-      ax = fig.subplots(1,1)
+        fig.clear()
+        ax = fig.subplots(1, 1)
 
     if two_plot:
-        ax = fig.subplots(2,1,sharex=True)
- 
+        ax = fig.subplots(2, 1, sharex=True)
+
     ax = np.atleast_1d(ax)
     if showTrend:
         plt.sca(ax[1])
-        plt.pcolormesh(q,x,data)
+        plt.pcolormesh(q, x, data)
         plt.grid()
         plt.ylabel("image number, 0 being older")
         plt.xlabel(r"q ($\AA^{-1}$)")
-        plt.clim( *clim )
+        plt.clim(*clim)
     if plotAverage:
-        ax[0].plot(q,data[0],label="first")
-        ax[0].plot(q,np.nanmean(data,axis=0),label="mean")
-        ax[0].plot(q,data[-1],label="last")
+        ax[0].plot(q, data[0], label="first")
+        ax[0].plot(q, np.nanmean(data, axis=0), label="mean")
+        ax[0].plot(q, data[-1], label="last")
         ax[0].legend()
         ax[0].grid()
 
     if (plotAverage or showTrend) and title is not None:
         plt.title(title)
 
-def plotdiffs(data,select=None,err=None,absSignal=None,absSignalScale=10,
-           showErr=False,cmap=plt.cm.jet,fig=None,title=None,plotDiffRef=False,labels=None):
+
+def plotdiffs(
+    data,
+    select=None,
+    err=None,
+    absSignal=None,
+    absSignalScale=10,
+    showErr=False,
+    cmap=plt.cm.jet,
+    fig=None,
+    ax=None,
+    title=None,
+    plotDiffRef=False,
+    labels=None,
+):
     """ Plot difference data
 
         Parameters
@@ -109,30 +145,37 @@ def plotdiffs(data,select=None,err=None,absSignal=None,absSignalScale=10,
           color map to use
         fig:
           matplotlib fig instance to use, if None creates a new one
+        ax:
+          matplotlib axes instance to use, if None creates a new one
         title: str
           title to use for plot (if None, no title is added)
         plotDiffRef:
           plot not only the diff but also the diffs_plus_ref (if present in data)
     """
-    if isinstance(data,(list,tuple)):
-        q,diffs,scan = args
+    if isinstance(data, (list, tuple)):
+        q, diffs, scan = args
         diffs_abs = None
     else:
         q = data["q"]
         diffs = data["diffs"]
-        scan  = data["scan"]
-        err   = data.get("err",None)
-        diffs_abs = data.get("diffs_plus_ref",None)
+        scan = data["scan"]
+        err = data.get("err", None)
+        diffs_abs = data.get("diffs_plus_ref", None)
 
-    # this selection trick done in this way allows to keep the same colors when 
+    # this selection trick done in this way allows to keep the same colors when
     # subselecting (because I do not change the size of diffs)
     if select is not None:
         indices = range(*select.indices(scan.shape[0]))
     else:
         indices = range(len(scan))
- 
-    if fig is None: fig = plt.figure()
- 
+
+    if ax is None:
+        if fig is None:
+            fig = plt.figure()
+        ax = fig.subplots(1, 1)
+    else:
+        fig = ax.figure
+
     lines_diff = []
     lines_abs = []
 
@@ -140,34 +183,40 @@ def plotdiffs(data,select=None,err=None,absSignal=None,absSignalScale=10,
         labels = [timeToStr(s) for s in scan]
 
     if absSignal is not None:
-        line = plt.plot(q,absSignal/absSignalScale,lw=3,
-                      color='k',label="absSignal/%s"%str(absSignalScale))[0]
+        line = ax.plot(
+            q,
+            absSignal / absSignalScale,
+            lw=3,
+            color="k",
+            label="absSignal/%s" % str(absSignalScale),
+        )[0]
         lines_abs.append(line)
-    for linenum,idiff in enumerate(indices):
-        color = cmap(idiff/(len(diffs)-1))
-        kw = dict( color = color, label = labels[idiff] )
+    for linenum, idiff in enumerate(indices):
+        color = cmap(idiff / (len(diffs) - 1))
+        kw = dict(color=color, label=labels[idiff])
         if err is not None and showErr:
-            line = plt.errorbar(q,diffs[idiff],err[idiff],**kw)[0]
+            line = ax.errorbar(q, diffs[idiff], err[idiff], **kw)[0]
             lines_diff.append(line)
         else:
-            line = plt.plot(q,diffs[idiff],**kw)[0]
+            line = ax.plot(q, diffs[idiff], **kw)[0]
             lines_diff.append(line)
             if diffs_abs is not None and plotDiffRef:
-                line = plt.plot(q,diffs_abs[idiff],color=color)[0]
+                line = ax.plot(q, diffs_abs[idiff], color=color)[0]
                 lines_abs.append(line)
-    if title is not None: fig.axes[0].set_title(title)
+    if title is not None:
+        fig.axes[0].set_title(title)
     legend = plt.legend(loc=4)
     plt.grid()
     plt.xlabel(r"q ($\AA^{-1}$)")
-    if 'info' in data and "ylabel" in data['info']:
-        plt.ylabel(data['info']['ylabel'])
+    if "info" in data and "ylabel" in data["info"]:
+        plt.ylabel(data["info"]["ylabel"])
     # we will set up a dict mapping legend line to orig line, and enable
     # picking on the legend line
     lined = dict()
     for legline, origline in zip(legend.get_lines(), lines_diff):
         legline.set_picker(5)  # 5 pts tolerance
         lined[legline] = origline
-  
+
     def onpick(event):
         # on the pick event, find the orig line corresponding to the
         # legend proxy line, and toggle the visibility
@@ -181,17 +230,19 @@ def plotdiffs(data,select=None,err=None,absSignal=None,absSignalScale=10,
             legline.set_alpha(1.0)
         else:
             legline.set_alpha(0.2)
-        fig    = plt.gcf() 
+        fig = plt.gcf()
         fig.canvas.draw()
- 
-    fig.canvas.mpl_connect('pick_event', onpick)
-    return lines_diff,lines_abs
 
-def updateLines(lines,data):
-    for l,d in zip(lines,data):
+    fig.canvas.mpl_connect("pick_event", onpick)
+    return lines_diff, lines_abs
+
+
+def updateLines(lines, data):
+    for l, d in zip(lines, data):
         l.set_ydata(d)
 
-def colorize(vector,vmin=None,vmax=None,ax=None,cmap=plt.cm.jet):
+
+def colorize(vector, vmin=None, vmax=None, ax=None, cmap=plt.cm.jet):
     """
     Recolor curves based on values of vector
 
@@ -209,12 +260,15 @@ def colorize(vector,vmin=None,vmax=None,ax=None,cmap=plt.cm.jet):
     vector = np.asarray(vector)
 
     # get plot
-    if ax is None: ax=plt.gca()
+    if ax is None:
+        ax = plt.gca()
 
     # normalize vector
-    if vmin is None: vmin = vector.min()
-    if vmax is None: vmax = vector.max()
-    vector = (vector-vmin)/(vmax-vmin)
+    if vmin is None:
+        vmin = vector.min()
+    if vmax is None:
+        vmax = vector.max()
+    vector = (vector - vmin) / (vmax - vmin)
 
-    for line,value in zip(ax.lines,vector):
+    for line, value in zip(ax.lines, vector):
         line.set_color(cmap(value))
