@@ -120,6 +120,7 @@ def plotdiffs(
     title=None,
     plotDiffRef=False,
     labels=None,
+    hide_lines=False
 ):
     """ Plot difference data
 
@@ -153,7 +154,7 @@ def plotdiffs(
           plot not only the diff but also the diffs_plus_ref (if present in data)
     """
     if isinstance(data, (list, tuple)):
-        q, diffs, scan = args
+        q, diffs, scan = data
         diffs_abs = None
     else:
         q = data["q"]
@@ -191,6 +192,7 @@ def plotdiffs(
             label="absSignal/%s" % str(absSignalScale),
         )[0]
         lines_abs.append(line)
+
     for linenum, idiff in enumerate(indices):
         color = cmap(idiff / (len(diffs) - 1))
         kw = dict(color=color, label=labels[idiff])
@@ -208,6 +210,14 @@ def plotdiffs(
     if title is not None:
         fig.axes[0].set_title(title)
     legend = plt.legend(loc=4)
+    
+    if hide_lines:
+        ax = plt.gca()
+        for l in ax.get_lines():
+            l.set_visible(False)
+        for l in legend.get_lines():
+            l.set_alpha(0.2)
+    
     plt.grid()
     plt.xlabel(r"q ($\AA^{-1}$)")
     if "info" in data and "ylabel" in data["info"]:
