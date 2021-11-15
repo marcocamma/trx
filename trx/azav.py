@@ -128,7 +128,8 @@ def dodezinger(ai, imgs, mask = None, npt_radial = 600, method = 'csr',dezinger=
                  unit='q_A^-1',method=method,mask=mask,percentile=dezinger)
   return np.squeeze(imgs)
 
-def do1d(ai, imgs, mask = None, npt_radial = 600, method = 'csr',safe=True,dark=10., polCorr = 1,dezinger=None):
+def do1d(ai, imgs, mask = None, npt_radial = 600, method = 'csr',safe=True,dark=10., 
+         polCorr = 1,dezinger=None, azimuth_range = None):
     """ ai is a pyFAI azimuthal intagrator 
               it can be defined with pyFAI.load(ponifile)
         dezinger: None or float (used as percentile of ai.separate)
@@ -147,7 +148,7 @@ def do1d(ai, imgs, mask = None, npt_radial = 600, method = 'csr',safe=True,dark=
                      dezinger=dezinger,method=method)
       q,i, sig = ai.integrate1d(img-dark, npt_radial, mask= mask, safe = safe,\
                  unit="q_A^-1", method = method, error_model = "poisson",
-                 polarization_factor = polCorr)
+                 polarization_factor = polCorr, azimuth_range = azimuth_range)
       out_i[_i] = i
       out_s[_i] = sig
     return q,np.squeeze(out_i),np.squeeze(out_s)
@@ -229,7 +230,7 @@ def getAI(poni=None,folder=None,**kwargs):
 def doFolder(folder="./",files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
     qlims=None,monitor='auto',save_pyfai=False,saveChi=True,poni='pyfai.poni',
     storageFile='auto',save=True,logDict=None,dezinger=None,skip_first=0,
-    last=None):
+    last=None, azimuth_range = None):
   """ calculate 1D curves from files in folder
 
       Parameters
@@ -378,7 +379,7 @@ def doFolder(folder="./",files='*.edf*',nQ = 1500,force=False,mask=None,dark=10,
     pbar = utils.progressBar(len(files))
     for ifname,fname in enumerate(files):
       img = read(fname)
-      q,i,e = do1d(ai,img,mask=mask,npt_radial=nQ,dark=dark,dezinger=dezinger)
+      q,i,e = do1d(ai,img,mask=mask,npt_radial=nQ,dark=dark,dezinger=dezinger, azimuth_range = azimuth_range)
       data[ifname] = i
       err[ifname]  = e
       if saveChi:

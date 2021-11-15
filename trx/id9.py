@@ -190,7 +190,7 @@ def readLogFile(fnameOrFolder,subtractDark=False,skip_first=0,
 
 def doFolder_azav(folder,nQ=1500,files='*.edf*',force=False,mask=None,
   saveChi=True,poni='pyfai.poni',storageFile='auto',dark=9.9,dezinger=None,
-  qlims=None,monitor='auto',skip_first=0,last=None,srcur_min=80,detector=None):
+  qlims=None,monitor='auto',skip_first=0,last=None,srcur_min=80,detector=None, azimuth_range = None):
   """ very small wrapper around azav.doFolder, essentially just reading
       the id9 logfile or diagnostics.log
       monitor  : normalization vector that can be given as
@@ -217,7 +217,7 @@ def doFolder_azav(folder,nQ=1500,files='*.edf*',force=False,mask=None,
 
   data = azav.doFolder(folder,files=files,nQ=nQ,force=force,mask=mask,
     saveChi=saveChi,poni=poni,storageFile=storageFile,logDict=loginfo,
-    dark=dark,save=False,dezinger=dezinger,qlims=qlims,monitor=monitor)
+    dark=dark,save=False,dezinger=dezinger,qlims=qlims,monitor=monitor, azimuth_range = azimuth_range)
   data.save(storageFile)
   data.info = extra_info
   return data
